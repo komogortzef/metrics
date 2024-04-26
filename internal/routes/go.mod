@@ -1,6 +1,6 @@
 module routes
 
-go 1.22.1
+go 1.21.9
 
 replace handlers => ../handlers
 
