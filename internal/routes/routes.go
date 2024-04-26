@@ -1,13 +1,12 @@
 package routes
 
 import (
-	h "handlers"
+	"handlers"
 	"net/http"
 )
 
 var Mux = http.NewServeMux()
 
 func init() {
-	Mux.HandleFunc("/update/gauge/", h.GaugeUpdate)
-	Mux.HandleFunc("/update/counter/", h.CounterUpdate)
+	Mux.HandleFunc("/update/", handlers.Update)
 }

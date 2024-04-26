@@ -1,6 +1,6 @@
 module github.com/komogortzef/metrics
 
-go 1.22.1
+go 1.21.9
 
 replace routes => ./internal/routes
 
