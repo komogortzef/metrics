@@ -24,9 +24,13 @@ func init() {
 	}
 }
 
-func (s *MemStorage) UpdateStorage(tp string, name string, val string) error {
+func (s *MemStorage) UpdateStorage(data ...string) error {
 	legalName := regexp.MustCompile(`^[A-Za-z]+[0-9]*$`)
 	legalVal := regexp.MustCompile(`-?[0-9]*\.?[0-9]+`)
+
+	tp := data[0]
+	name := data[1]
+	val := data[2]
 
 	switch tp {
 

@@ -8,5 +8,5 @@ import (
 var Mux = http.NewServeMux()
 
 func init() {
-	Mux.HandleFunc("/update/", handlers.Update)
+	Mux.HandleFunc("/update/", handlers.UpdateMem)
 }

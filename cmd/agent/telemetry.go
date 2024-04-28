@@ -1,6 +1,11 @@
 package main
 
-type Telemetry interface {
-	CollectTelemetry()
-	SendTelemetry() error
+import (
+	"net/http"
+	"sync"
+)
+
+type TelemetryProvider interface {
+	Collect(*sync.WaitGroup)
+	Send(*http.Client, *sync.WaitGroup)
 }
