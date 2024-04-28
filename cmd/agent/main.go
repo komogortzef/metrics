@@ -1,3 +1,7 @@
 package main
 
-func main() {}
+func main() {
+
+	selfMonitor := NewSelfMonitor()
+	RunAgent(selfMonitor)
+}

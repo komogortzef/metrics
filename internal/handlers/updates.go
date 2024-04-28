@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func Update(resp http.ResponseWriter, req *http.Request) {
+func UpdateMem(resp http.ResponseWriter, req *http.Request) {
 
 	if req.Method != http.MethodPost {
 		http.Error(resp, "Method not allowed", http.StatusMethodNotAllowed)
