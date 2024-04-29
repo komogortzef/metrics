@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func UpdateMem(resp http.ResponseWriter, req *http.Request) {
+func SaveToMem(resp http.ResponseWriter, req *http.Request) {
 
 	if req.Method != http.MethodPost {
 		http.Error(resp, "Method not allowed", http.StatusMethodNotAllowed)
@@ -20,11 +20,7 @@ func UpdateMem(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	metricType := reqElem[1]
-	metricName := reqElem[2]
-	metricVal := reqElem[3]
-
-	err := storage.Mem.UpdateStorage(metricType, metricName, metricVal)
+	err := storage.Mem.Save(reqElem[1:]...)
 	if err != nil {
 		switch err.Error() {
 		case "NotFound":

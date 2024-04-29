@@ -24,7 +24,7 @@ func init() {
 	}
 }
 
-func (s *MemStorage) UpdateStorage(data ...string) error {
+func (s *MemStorage) Save(data ...string) error {
 	legalName := regexp.MustCompile(`^[A-Za-z]+[0-9]*$`)
 	legalVal := regexp.MustCompile(`-?[0-9]*\.?[0-9]+`)
 
@@ -59,6 +59,7 @@ func (s *MemStorage) UpdateStorage(data ...string) error {
 	default:
 		return errors.New("BadReq")
 	}
+	log.Println()
 
 	return nil
 }
