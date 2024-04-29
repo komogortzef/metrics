@@ -1,7 +1,9 @@
 package main
 
+import "telemetry"
+
 func main() {
 
-	selfMonitor := NewSelfMonitor()
-	RunAgent(selfMonitor)
+	selfMonitor := telemetry.NewSelfMonitor()
+	selfMonitor.Run()
 }

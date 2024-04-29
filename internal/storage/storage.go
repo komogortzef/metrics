@@ -1,6 +1,6 @@
 package storage
 
 type Storage interface {
-	Save(...string) error
-	Retrive() (string, error)
+	Save(data ...[]byte) error
+	Fetch(keys ...string) (any, error)
 }

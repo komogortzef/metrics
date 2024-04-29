@@ -2,35 +2,21 @@ package storage
 
 import (
 	"errors"
-	"log"
+	"fmt"
 	"regexp"
 	"strconv"
 )
 
-type gauge map[string]float64
-type counter map[string]int64
+type MemStorage map[string]any
 
-type MemStorage struct {
-	gauges   gauge
-	counters counter
-}
+var Mem = make(MemStorage)
 
-var Mem MemStorage
-
-func init() {
-	Mem = MemStorage{
-		gauges:   make(gauge),
-		counters: make(counter),
-	}
-}
-
-func (s *MemStorage) Save(data ...string) error {
+func (s *MemStorage) Save(data ...[]byte) error {
 	legalName := regexp.MustCompile(`^[A-Za-z]+[0-9]*$`)
-	legalVal := regexp.MustCompile(`-?[0-9]*\.?[0-9]+`)
 
-	tp := data[0]
-	name := data[1]
-	val := data[2]
+	tp := string(data[0])
+	name := string(data[1])
+	val := string(data[2])
 
 	switch tp {
 
@@ -39,27 +25,43 @@ func (s *MemStorage) Save(data ...string) error {
 			return errors.New("NotFound")
 		}
 		num, err := strconv.ParseFloat(val, 64)
-		if err != nil || !legalVal.MatchString(val) {
+		if err != nil {
 			return errors.New("BadReq")
 		}
-		s.gauges[name] = num
-		log.Println("gauge has been updated:", s.gauges)
+		(*s)[name] = num
 
 	case "counter":
 		if !legalName.MatchString(name) {
 			return errors.New("NotFound")
 		}
 		num, err := strconv.ParseInt(val, 10, 64)
-		if err != nil || !legalVal.MatchString(val) {
+		if err != nil {
 			return errors.New("BadReq")
 		}
-		s.counters[name] += num
-		log.Println("counter has been updated:", s.counters)
+
+		if val, ok := (*s)[name].(int64); ok {
+			(*s)[name] = val + num
+		} else {
+			(*s)[name] = num
+		}
+
+		fmt.Println((*s)["PollCount"])
 
 	default:
 		return errors.New("BadReq")
 	}
-	log.Println()
 
 	return nil
+}
+
+func (s *MemStorage) Fetch(keys ...string) (any, error) {
+	key := keys[0]
+
+	val, ok := (*s)[key]
+	if !ok {
+		return nil, errors.New("no data available")
+	}
+
+	return val, nil
+
 }

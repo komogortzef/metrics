@@ -20,7 +20,11 @@ func SaveToMem(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err := storage.Mem.Save(reqElem[1:]...)
+	tp := []byte(reqElem[1])
+	name := []byte(reqElem[2])
+	val := []byte(reqElem[3])
+
+	err := storage.Mem.Save(tp, name, val)
 	if err != nil {
 		switch err.Error() {
 		case "NotFound":

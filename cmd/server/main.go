@@ -7,8 +7,11 @@ import (
 
 func main() {
 
-	err := http.ListenAndServe(":8080", routes.Mux)
-	if err != nil {
+	if err := run(); err != nil {
 		panic(err)
 	}
+}
+
+func run() error {
+	return http.ListenAndServe("localhost:8080", routes.Mux)
 }
