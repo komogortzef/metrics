@@ -28,6 +28,7 @@ type SelfMonitor struct {
 	runtime.MemStats
 	randVal     float64
 	pollCount   int64
+	serverAddr  string
 	sendReports []Report
 }
 
@@ -35,7 +36,7 @@ func NewSelfMonitor() *SelfMonitor {
 	var memSt runtime.MemStats
 	runtime.ReadMemStats(&memSt)
 
-	return &SelfMonitor{memSt, 0, 0, []Report{}}
+	return &SelfMonitor{memSt, 0, 0, baseUrl, []Report{}}
 }
 
 func (m *SelfMonitor) report() (string, error) {
@@ -68,6 +69,7 @@ func (m *SelfMonitor) Collect() {
 		runtime.ReadMemStats(&m.MemStats)
 		m.randVal = rand.Float64()
 		m.pollCount += 1
+		m.sendReports = m.sendReports[:0]
 		time.Sleep(pollInterval)
 	}
 }
@@ -106,12 +108,10 @@ func (m *SelfMonitor) Send() {
 		m.sendPost("counter", "PollCount", m.pollCount)
 		m.pollCount = 0
 
-		rep, err := m.report()
+		_, err := m.report()
 		if err != nil {
 			fmt.Println(err)
 		}
-		fmt.Println(rep)
-		m.sendReports = m.sendReports[:0]
 
 		time.Sleep(reportInterval)
 	}
@@ -119,7 +119,7 @@ func (m *SelfMonitor) Send() {
 }
 
 func (m *SelfMonitor) sendPost(tp, name string, val any) {
-	url := fmt.Sprintf("%s/update/%s/%s/%v", baseUrl, tp, name, val)
+	url := fmt.Sprintf("%s/update/%s/%s/%v", m.serverAddr, tp, name, val)
 
 	resp, err := http.Post(url, "text/plain", nil)
 	if err != nil {
