@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
-	"storage"
 	"strings"
+
+	"github.com/komogortzef/metrics/internal/storage"
 )
 
 type Handler struct {
@@ -11,15 +13,17 @@ type Handler struct {
 }
 
 func NewHandler(store storage.Storage) *Handler {
+	log.Println("\nhandler creating...")
 	return &Handler{
 		store: store,
 	}
 }
 
 func (h *Handler) SaveToMem(resp http.ResponseWriter, req *http.Request) {
-
+	log.Println("\nstart of request processing...")
 	if req.Method != http.MethodPost {
-		http.Error(resp, "Method not allowed", http.StatusMethodNotAllowed)
+		log.Println("Method is not allowed")
+		http.Error(resp, "Method is not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -34,6 +38,7 @@ func (h *Handler) SaveToMem(resp http.ResponseWriter, req *http.Request) {
 	name := []byte(reqElem[2])
 	val := []byte(reqElem[3])
 
+	log.Println("saving data...")
 	err := h.store.Save(tp, name, val)
 	if err != nil {
 		http.Error(resp, "Bad Request", http.StatusBadRequest)

@@ -7,15 +7,13 @@ import (
 	"regexp"
 	"testing"
 
-	"storage"
-
+	"github.com/komogortzef/metrics/internal/storage"
 	"github.com/stretchr/testify/assert"
 )
 
 type MockStorage struct{}
 
 func (m MockStorage) Save(data ...[]byte) error {
-
 	tp := string(data[0])
 	val := string(data[2])
 	realNums := regexp.MustCompile(`^-?\d+(\.\d+)?$`)
@@ -104,7 +102,6 @@ func TestSaveToMem(t *testing.T) {
 	}
 
 	for _, test := range tests {
-
 		t.Run(test.name, func(t *testing.T) {
 			request := httptest.NewRequest(test.method, test.url, nil)
 			responseRecorder := httptest.NewRecorder()
@@ -112,9 +109,9 @@ func TestSaveToMem(t *testing.T) {
 			handler.SaveToMem(responseRecorder, request)
 
 			response := responseRecorder.Result()
+			defer response.Body.Close()
 
 			assert.Equal(t, test.expected, response.StatusCode, test.description)
-
 		})
 	}
 }

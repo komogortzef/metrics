@@ -8,6 +8,7 @@ import (
 type MemStorage map[string]any
 
 func (s MemStorage) Save(data ...[]byte) error {
+	log.Println("\nstart saving data...")
 
 	tp := string(data[0])
 	name := string(data[1])
@@ -27,7 +28,7 @@ func (s MemStorage) Save(data ...[]byte) error {
 	case "counter":
 		num, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
-			log.Println("Invlid counter value")
+			log.Println("Invalid counter value")
 			return StoreErr{"Invalid counter value"}
 		}
 

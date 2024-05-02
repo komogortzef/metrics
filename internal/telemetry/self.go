@@ -14,7 +14,7 @@ import (
 const (
 	pollInterval   = 2 * time.Second
 	reportInterval = 10 * time.Second
-	baseUrl        = "http://localhost:8080"
+	baseURL        = "http://localhost:8080"
 )
 
 type Report struct {
@@ -36,11 +36,10 @@ func NewSelfMonitor() *SelfMonitor {
 	var memSt runtime.MemStats
 	runtime.ReadMemStats(&memSt)
 
-	return &SelfMonitor{memSt, 0, 0, baseUrl, []Report{}}
+	return &SelfMonitor{memSt, 0, 0, baseURL, []Report{}}
 }
 
 func (m *SelfMonitor) report() (string, error) {
-
 	if len(m.sendReports) < 1 {
 		return "", errors.New("no report")
 	}
@@ -66,10 +65,12 @@ func (m *SelfMonitor) report() (string, error) {
 func (m *SelfMonitor) Collect() {
 	time.Sleep(pollInterval)
 	for {
+		log.Println("\nstart of data collection")
 		runtime.ReadMemStats(&m.MemStats)
 		m.randVal = rand.Float64()
 		m.pollCount += 1
 		m.sendReports = m.sendReports[:0]
+		log.Println("End of data collection")
 		time.Sleep(pollInterval)
 	}
 }
@@ -77,6 +78,7 @@ func (m *SelfMonitor) Collect() {
 func (m *SelfMonitor) Send() {
 	time.Sleep(reportInterval)
 	for {
+		log.Println("\nStart of data sending")
 		m.sendPost("gauge", "Alloc", m.Alloc)
 		m.sendPost("gauge", "BuckHashSys", m.BuckHashSys)
 		m.sendPost("gauge", "Frees", m.Frees)
@@ -113,18 +115,22 @@ func (m *SelfMonitor) Send() {
 			fmt.Println(err)
 		}
 
+		log.Println("End of data sending")
 		time.Sleep(reportInterval)
 	}
-
 }
 
 func (m *SelfMonitor) sendPost(tp, name string, val any) {
 	url := fmt.Sprintf("%s/update/%s/%s/%v", m.serverAddr, tp, name, val)
+	log.Println("\nsending a request to:", url)
 
+	log.Println("setting a connection...")
 	resp, err := http.Post(url, "text/plain", nil)
 	if err != nil {
 		log.Println("There is no connection to the server")
 	}
+	defer resp.Body.Close()
+	log.Println("The connection is established and data is data has been sent")
 
 	report := Report{
 		tp,
@@ -137,7 +143,9 @@ func (m *SelfMonitor) sendPost(tp, name string, val any) {
 }
 
 func (m *SelfMonitor) Run() {
+	log.Println("\nmonitor running...")
 	go m.Collect()
 	go m.Send()
+	log.Println("monitor is running")
 	select {}
 }

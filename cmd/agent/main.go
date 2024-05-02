@@ -1,9 +1,8 @@
 package main
 
-import "telemetry"
+import "github.com/komogortzef/metrics/internal/telemetry"
 
 func main() {
-
 	selfMonitor := telemetry.NewSelfMonitor()
 	selfMonitor.Run()
 }

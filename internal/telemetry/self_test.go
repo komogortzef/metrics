@@ -11,9 +11,9 @@ import (
 )
 
 func mockHandler(w http.ResponseWriter, r *http.Request) {
-	validUrl := regexp.MustCompile(`^(http|https)://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}(/.*)?$`)
+	validURL := regexp.MustCompile(`^(http|https)://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,}(/.*)?$`)
 
-	if !validUrl.MatchString(r.URL.String()) {
+	if !validURL.MatchString(r.URL.String()) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
