@@ -1,13 +1,16 @@
 package routes
 
 import (
-	"handlers"
 	"net/http"
-	"storage"
+
+	"github.com/komogortzef/metrics/internal/handlers"
+	"github.com/komogortzef/metrics/internal/storage"
 )
 
-var Mux = http.NewServeMux()
-var handler = handlers.NewHandler(storage.MemStorage{})
+var (
+	Mux     = http.NewServeMux()
+	handler = handlers.NewHandler(storage.MemStorage{})
+)
 
 func init() {
 	Mux.HandleFunc("/update/", handler.SaveToMem)

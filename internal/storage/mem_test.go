@@ -20,12 +20,12 @@ func TestSave(t *testing.T) {
 		{
 			name: "to save incorrect gauge value",
 			args: [][]byte{[]byte("gauge"), []byte("someGauge"), []byte("invalid")},
-			want: StoreErr{"Invalid gauge value"},
+			want: StoreError{"Invalid gauge value"},
 		},
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		go t.Run(test.name, func(t *testing.T) {
 			if err := mem.Save(test.args...); err != test.want {
 				t.Errorf("Result: %v\tWant: %v", err, test.want)
 			}

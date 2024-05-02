@@ -14,11 +14,11 @@ import (
 const (
 	pollInterval   = 2 * time.Second
 	reportInterval = 10 * time.Second
-	baseUrl        = "http://localhost:8080"
+	baseURL        = "http://localhost:8080"
 )
 
 type Report struct {
-	tp    string
+	typ   string
 	name  string
 	value string
 	resp  *http.Response
@@ -34,30 +34,30 @@ type SelfMonitor struct {
 
 func NewSelfMonitor() *SelfMonitor {
 	var memSt runtime.MemStats
-	runtime.ReadMemStats(&memSt)
 
-	return &SelfMonitor{memSt, 0, 0, baseUrl, []Report{}}
+	runtime.ReadMemStats(&memSt)
+	return &SelfMonitor{memSt, 0, 0, baseURL, []Report{}}
 }
 
 func (m *SelfMonitor) report() (string, error) {
-
 	if len(m.sendReports) < 1 {
 		return "", errors.New("no report")
 	}
+
 	var builder strings.Builder
 
 	builder.WriteString("type\tname\tvalue\tsize\tstatus")
 
-	for _, r := range m.sendReports {
-		s := fmt.Sprintf(
+	for _, report := range m.sendReports {
+		str := fmt.Sprintf(
 			"\n%s\t%s\t%s\t%v\t%v",
-			r.tp,
-			r.name,
-			r.value,
-			r.resp.Status,
-			r.resp.ContentLength,
+			report.typ,
+			report.name,
+			report.value,
+			report.resp.Status,
+			report.resp.ContentLength,
 		)
-		builder.WriteString(s)
+		builder.WriteString(str)
 	}
 
 	return builder.String(), nil
@@ -65,18 +65,24 @@ func (m *SelfMonitor) report() (string, error) {
 
 func (m *SelfMonitor) Collect() {
 	time.Sleep(pollInterval)
+
 	for {
+		log.Println("\nstart of data collection")
 		runtime.ReadMemStats(&m.MemStats)
 		m.randVal = rand.Float64()
-		m.pollCount += 1
+		m.pollCount++
 		m.sendReports = m.sendReports[:0]
+
+		log.Println("End of data collection")
 		time.Sleep(pollInterval)
 	}
 }
 
 func (m *SelfMonitor) Send() {
 	time.Sleep(reportInterval)
+
 	for {
+		log.Println("\nStart of data sending")
 		m.sendPost("gauge", "Alloc", m.Alloc)
 		m.sendPost("gauge", "BuckHashSys", m.BuckHashSys)
 		m.sendPost("gauge", "Frees", m.Frees)
@@ -113,21 +119,27 @@ func (m *SelfMonitor) Send() {
 			fmt.Println(err)
 		}
 
+		log.Println("End of data sending")
 		time.Sleep(reportInterval)
 	}
-
 }
 
-func (m *SelfMonitor) sendPost(tp, name string, val any) {
-	url := fmt.Sprintf("%s/update/%s/%s/%v", m.serverAddr, tp, name, val)
+func (m *SelfMonitor) sendPost(typ, name string, val any) {
+	URL := fmt.Sprintf("%s/update/%s/%s/%v", m.serverAddr, typ, name, val)
+	log.Println("\nsending a request to:", URL)
 
-	resp, err := http.Post(url, "text/plain", nil)
+	log.Println("setting a connection...")
+	resp, err := http.Post(URL, "text/plain", nil)
+
 	if err != nil {
 		log.Println("There is no connection to the server")
 	}
 
+	defer resp.Body.Close()
+	log.Println("The connection is established and data is data has been sent")
+
 	report := Report{
-		tp,
+		typ,
 		name,
 		fmt.Sprintf("%v", val),
 		resp,
@@ -137,7 +149,10 @@ func (m *SelfMonitor) sendPost(tp, name string, val any) {
 }
 
 func (m *SelfMonitor) Run() {
+	log.Println("\nmonitor running...")
+
 	go m.Collect()
 	go m.Send()
+	log.Println("monitor is running")
 	select {}
 }

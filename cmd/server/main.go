@@ -2,11 +2,11 @@ package main
 
 import (
 	"net/http"
-	"routes"
+
+	"github.com/komogortzef/metrics/internal/routes"
 )
 
 func main() {
-
 	if err := run(); err != nil {
 		panic(err)
 	}
