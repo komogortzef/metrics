@@ -53,11 +53,6 @@ func (s MemStorage) Save(data ...[]byte) error {
 	return nil
 }
 
-// Fetch ...
-func (s MemStorage) Fetch() ([]any, error) {
-	return nil, nil
-}
-
 // StoreError ...
 type StoreError struct {
 	Err string

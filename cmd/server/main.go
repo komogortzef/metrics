@@ -13,5 +13,5 @@ func main() {
 }
 
 func run() error {
-	return http.ListenAndServe("localhost:8080", routes.SetRouter("mem"))
+	return http.ListenAndServe("localhost:8080", routes.SetRouter())
 }

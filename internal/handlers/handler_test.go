@@ -119,11 +119,11 @@ func TestSaveToMem(t *testing.T) {
 
 	for _, test := range tests {
 		resp, get := testRequest(t, tserv, test.method, test.url)
+		defer resp.Body.Close()
 		assert.Equal(t, test.expected, resp.StatusCode)
 
 		if test.method == http.MethodGet {
 			fmt.Println(get)
 		}
-
 	}
 }

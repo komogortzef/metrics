@@ -36,7 +36,7 @@ func (h *Handler) SaveToMem(resp http.ResponseWriter, req *http.Request) {
 	log.Println("SaveToMem completed")
 }
 
-func (h *Handler) ShowAll(resp http.ResponseWriter, req *http.Request) {
+func (h *Handler) ShowAll(resp http.ResponseWriter, _ *http.Request) {
 	log.Println("ShowAll handler")
 
 	res := strings.Builder{}
@@ -48,7 +48,10 @@ func (h *Handler) ShowAll(resp http.ResponseWriter, req *http.Request) {
 			str := fmt.Sprintf("%s: %v\n", name, val)
 			res.WriteString(str)
 		}
-		resp.Write([]byte(res.String()))
+		_, err := resp.Write([]byte(res.String()))
+		if err != nil {
+			log.Println(err)
+		}
 		log.Println("ShowAll completed")
 	default:
 		log.Println("Unknown type:", T)
@@ -71,7 +74,10 @@ func (h *Handler) GetMetric(resp http.ResponseWriter, req *http.Request) {
 			return
 		}
 		res := fmt.Sprintf("%v", val)
-		resp.Write([]byte(res))
+		_, err := resp.Write([]byte(res))
+		if err != nil {
+			log.Println(err)
+		}
 	default:
 		log.Println("Unknown type:", T)
 		resp.WriteHeader(http.StatusNotFound)
