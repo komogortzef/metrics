@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/komogortzef/metrics/internal/storage"
 )
 
@@ -20,27 +22,59 @@ func NewHandler(store storage.Storage) *Handler {
 }
 
 func (h *Handler) SaveToMem(resp http.ResponseWriter, req *http.Request) {
-	log.Println("\nstart of request processing...")
-	if req.Method != http.MethodPost {
-		log.Println("Method is not allowed")
-		http.Error(resp, "Method is not allowed", http.StatusMethodNotAllowed)
-		return
-	}
+	log.Println("SaveToMem handler")
 
-	uri := req.URL.Path[1:]
-	reqElem := strings.Split(uri, "/")
-	if len(reqElem) != 4 {
-		http.Error(resp, "Not Found", http.StatusNotFound)
-		return
-	}
-
-	tp := []byte(reqElem[1])
-	name := []byte(reqElem[2])
-	val := []byte(reqElem[3])
+	tp := []byte(chi.URLParam(req, "tp"))
+	name := []byte(chi.URLParam(req, "name"))
+	val := []byte(chi.URLParam(req, "val"))
 
 	log.Println("saving data...")
 	err := h.store.Save(tp, name, val)
 	if err != nil {
 		http.Error(resp, "Bad Request", http.StatusBadRequest)
+	}
+	log.Println("SaveToMem completed")
+}
+
+func (h *Handler) ShowAll(resp http.ResponseWriter, req *http.Request) {
+	log.Println("ShowAll handler")
+
+	res := strings.Builder{}
+
+	switch T := h.store.(type) {
+	case storage.MemStorage:
+		store, _ := h.store.(storage.MemStorage)
+		for name, val := range store {
+			str := fmt.Sprintf("%s: %v\n", name, val)
+			res.WriteString(str)
+		}
+		resp.Write([]byte(res.String()))
+		log.Println("ShowAll completed")
+	default:
+		log.Println("Unknown type:", T)
+		resp.WriteHeader(http.StatusNotFound)
+		return
+	}
+}
+
+func (h *Handler) GetMetric(resp http.ResponseWriter, req *http.Request) {
+	log.Println("GetMetric start..")
+
+	name := chi.URLParam(req, "name")
+
+	switch T := h.store.(type) {
+	case storage.MemStorage:
+		store, _ := h.store.(storage.MemStorage)
+		val, ok := store[name]
+		if !ok {
+			resp.WriteHeader(http.StatusNotFound)
+			return
+		}
+		res := fmt.Sprintf("%v", val)
+		resp.Write([]byte(res))
+	default:
+		log.Println("Unknown type:", T)
+		resp.WriteHeader(http.StatusNotFound)
+		return
 	}
 }

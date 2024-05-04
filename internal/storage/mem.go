@@ -43,6 +43,7 @@ func (s MemStorage) Save(data ...[]byte) error {
 		}
 
 		log.Println(typ, name, ":", val, "\t", "the value is received")
+		log.Println("Counter:", s[name])
 
 	default:
 		log.Println("Ivalid metric type")
@@ -53,15 +54,8 @@ func (s MemStorage) Save(data ...[]byte) error {
 }
 
 // Fetch ...
-func (s MemStorage) Fetch(keys ...string) (any, error) {
-	key := keys[0]
-
-	val, ok := s[key]
-	if !ok {
-		log.Println("Failed to get the value")
-		return nil, StoreError{"Failure to get the value"}
-	}
-	return val, nil
+func (s MemStorage) Fetch() ([]any, error) {
+	return nil, nil
 }
 
 // StoreError ...
