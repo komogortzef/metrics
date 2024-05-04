@@ -1,6 +1,6 @@
 module github.com/komogortzef/metrics
 
-go 1.21.9
+go 1.22.1
 
 require github.com/stretchr/testify v1.9.0
 

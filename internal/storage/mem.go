@@ -1,3 +1,4 @@
+// Package storage ...
 package storage
 
 import (
@@ -5,8 +6,10 @@ import (
 	"strconv"
 )
 
+// MemStorage ...
 type MemStorage map[string]any
 
+// Save ...
 func (s MemStorage) Save(data ...[]byte) error {
 	log.Println("\nstart saving data...")
 
@@ -49,6 +52,7 @@ func (s MemStorage) Save(data ...[]byte) error {
 	return nil
 }
 
+// Fetch ...
 func (s MemStorage) Fetch(keys ...string) (any, error) {
 	key := keys[0]
 
@@ -60,6 +64,7 @@ func (s MemStorage) Fetch(keys ...string) (any, error) {
 	return val, nil
 }
 
+// StoreError ...
 type StoreError struct {
 	Err string
 }
