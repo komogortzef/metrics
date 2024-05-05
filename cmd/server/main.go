@@ -1,17 +1,10 @@
 package main
 
-import (
-	"net/http"
-
-	"github.com/komogortzef/metrics/internal/routes"
-)
+import "github.com/komogortzef/metrics/internal/config"
 
 func main() {
-	if err := run(); err != nil {
+
+	if err := config.Run(); err != nil {
 		panic(err)
 	}
-}
-
-func run() error {
-	return http.ListenAndServe("localhost:8080", routes.SetRouter())
 }

@@ -1,3 +1,4 @@
+// handlers тип сервера и привязанные к нему обработчики
 package handlers
 
 import (
@@ -10,40 +11,38 @@ import (
 	"github.com/komogortzef/metrics/internal/storage"
 )
 
-type Handler struct {
-	store storage.Storage
+// Server - конфигурация сервера.(сокет и тип хранилища)
+type Server struct {
+	Endpoint string
+	Store    storage.Storage
 }
 
-func NewHandler(store storage.Storage) *Handler {
-	log.Println("handler creating...")
-	return &Handler{
-		store: store,
-	}
-}
-
-func (h *Handler) SaveToMem(resp http.ResponseWriter, req *http.Request) {
+// SaveToMem сохранить в память(обработчик метода POST)
+func (h *Server) SaveToMem(resp http.ResponseWriter, req *http.Request) {
 	log.Println("SaveToMem handler")
 
-	tp := []byte(chi.URLParam(req, "tp"))
-	name := []byte(chi.URLParam(req, "name"))
-	val := []byte(chi.URLParam(req, "val"))
+	tp := chi.URLParam(req, "tp")
+	name := chi.URLParam(req, "name")
+	val := chi.URLParam(req, "val")
 
 	log.Println("saving data...")
-	err := h.store.Save(tp, name, val)
+	err := h.Store.Save(tp, name, val)
 	if err != nil {
 		http.Error(resp, "Bad Request", http.StatusBadRequest)
 	}
 	log.Println("SaveToMem completed")
 }
 
-func (h *Handler) ShowAll(resp http.ResponseWriter, _ *http.Request) {
+// ShowAll обработчик метода GET
+func (h *Server) ShowAll(resp http.ResponseWriter, _ *http.Request) {
 	log.Println("ShowAll handler")
 
 	res := strings.Builder{}
 
-	switch T := h.store.(type) {
+	// в зависимости от типа хранилища выбираем логику извлечения данных
+	switch T := h.Store.(type) {
 	case storage.MemStorage:
-		store, _ := h.store.(storage.MemStorage)
+		store, _ := h.Store.(storage.MemStorage)
 		for name, val := range store {
 			str := fmt.Sprintf("%s: %v\n", name, val)
 			res.WriteString(str)
@@ -60,14 +59,16 @@ func (h *Handler) ShowAll(resp http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-func (h *Handler) GetMetric(resp http.ResponseWriter, req *http.Request) {
+// GetMetric обработчик метода GET
+func (h *Server) GetMetric(resp http.ResponseWriter, req *http.Request) {
 	log.Println("GetMetric start..")
 
 	name := chi.URLParam(req, "name")
 
-	switch T := h.store.(type) {
+	// в зависимости от типа хранилища выбираем логику извлечения данных
+	switch T := h.Store.(type) {
 	case storage.MemStorage:
-		store, _ := h.store.(storage.MemStorage)
+		store, _ := h.Store.(storage.MemStorage)
 		val, ok := store[name]
 		if !ok {
 			resp.WriteHeader(http.StatusNotFound)

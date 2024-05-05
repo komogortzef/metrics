@@ -14,7 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testRequest(t *testing.T, ts *httptest.Server, method, path string) (*http.Response, string) {
+func testRequest(t *testing.T,
+	ts *httptest.Server,
+	method, path string) (*http.Response, string) {
 	log.Println("test request starts")
 	req, err := http.NewRequest(method, ts.URL+path, nil)
 	require.NoError(t, err)
@@ -35,11 +37,14 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string) (*http.
 func TestSaveToMem(t *testing.T) {
 	r := chi.NewRouter()
 
-	h := NewHandler(storage.MemStorage{})
-	r.Get("/", h.ShowAll)
+	srv := Server{ // определил для тестов
+		Store: storage.MemStorage{},
+	}
+
+	r.Get("/", srv.ShowAll)
 	r.Route("/", func(r chi.Router) {
-		r.Get("/value/{tp}/{name}", h.GetMetric)
-		r.Post("/update/{tp}/{name}/{val}", h.SaveToMem)
+		r.Get("/value/{tp}/{name}", srv.GetMetric)
+		r.Post("/update/{tp}/{name}/{val}", srv.SaveToMem)
 	})
 
 	tserv := httptest.NewServer(r)

@@ -9,17 +9,17 @@ func TestSave(t *testing.T) {
 
 	tests := []struct {
 		name string
-		args [][]byte
+		args []string
 		want error
 	}{
 		{
 			name: "to save correct gauge value",
-			args: [][]byte{[]byte("gauge"), []byte("someGauge"), []byte("100.01")},
+			args: []string{"gauge", "someGauge", "100.01"},
 			want: nil,
 		},
 		{
 			name: "to save incorrect gauge value",
-			args: [][]byte{[]byte("gauge"), []byte("someGauge"), []byte("invalid")},
+			args: []string{"gauge", "someGauge", "invalid"},
 			want: StoreError{"Invalid gauge value"},
 		},
 	}

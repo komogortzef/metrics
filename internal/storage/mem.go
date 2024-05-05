@@ -6,44 +6,47 @@ import (
 	"strconv"
 )
 
-// MemStorage ...
+type Storage interface {
+	Save(data ...string) error
+}
+
+// MemStorage просто map
 type MemStorage map[string]any
 
 // Save ...
-func (s MemStorage) Save(data ...[]byte) error {
-	log.Println("\nstart saving data...")
+func (s MemStorage) Save(data ...string) error {
+	log.Println("Start saving data...")
 
-	typ := string(data[0])
-	name := string(data[1])
-	val := string(data[2])
+	metType := data[0]
+	metName := data[1]
+	metVal := data[2]
 
-	switch typ {
+	switch metType {
 	case "gauge":
-		num, err := strconv.ParseFloat(val, 64)
+		num, err := strconv.ParseFloat(metVal, 64)
 		if err != nil {
 			log.Println("Ivalid gauge value")
 			return StoreError{"Invalid gauge value"}
 		}
 
-		s[name] = num
+		s[metName] = num
 
-		log.Println(typ, name, ":", val, ".", "The value is received")
+		log.Println(metType, metName, ":", metVal, ".", "The value is received")
 
 	case "counter":
-		num, err := strconv.ParseInt(val, 10, 64)
+		num, err := strconv.ParseInt(metVal, 10, 64)
 		if err != nil {
 			log.Println("Invalid counter value")
 			return StoreError{"Invalid counter value"}
 		}
 
-		if val, ok := s[name].(int64); ok {
-			s[name] = val + num
+		if metVal, ok := s[metName].(int64); ok {
+			s[metName] = metVal + num
 		} else {
-			s[name] = num
+			s[metName] = num
 		}
 
-		log.Println(typ, name, ":", val, "\t", "the value is received")
-		log.Println("Counter:", s[name])
+		log.Println(metType, metName, ":", metVal, "\t", "the value is received")
 
 	default:
 		log.Println("Ivalid metric type")
