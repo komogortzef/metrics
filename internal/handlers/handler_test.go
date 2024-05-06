@@ -37,7 +37,7 @@ func testRequest(t *testing.T,
 func TestSaveToMem(t *testing.T) {
 	r := chi.NewRouter()
 
-	srv := Server{ // определил для тестов
+	srv := Config{ // определил для тестов
 		Store: storage.MemStorage{},
 	}
 

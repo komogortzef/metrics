@@ -12,11 +12,10 @@ import (
 	"github.com/komogortzef/metrics/internal/storage"
 )
 
-var isHostPort = regexp.MustCompile(`^(.*):(\d+)$`)
+const maxArgs = 3
 
 func run() error {
-
-	if len(os.Args) > 3 {
+	if len(os.Args) > maxArgs {
 		return errors.New("you must specify the endpoint: <./server -a host:port>")
 	}
 
@@ -26,6 +25,7 @@ func run() error {
 	flag.StringVar(&srv.Endpoint, "a", "localhost:8080", "set Endpoint address: <host:port>")
 	flag.Parse()
 
+	isHostPort := regexp.MustCompile(`^(.*):(\d+)$`)
 	if !isHostPort.MatchString(srv.Endpoint) {
 		return errors.New("the required format of the endpoint address: <host:port>")
 	}
