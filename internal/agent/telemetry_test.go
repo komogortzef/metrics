@@ -1,4 +1,4 @@
-package telemetry
+package agent
 
 import (
 	"net/http"

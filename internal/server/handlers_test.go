@@ -1,4 +1,4 @@
-package handlers
+package server
 
 import (
 	"fmt"
@@ -37,7 +37,7 @@ func testRequest(t *testing.T,
 func TestSaveToMem(t *testing.T) {
 	r := chi.NewRouter()
 
-	srv := Server{ // определил для тестов
+	srv := ServerConf{ // определил для тестов
 		Store: storage.MemStorage{},
 	}
 

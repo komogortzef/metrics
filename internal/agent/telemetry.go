@@ -1,7 +1,6 @@
-package telemetry
+package agent
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -15,14 +14,8 @@ import (
 type TelemetryProvider interface {
 	Collect()
 	Send()
-	Run()
+	Perform()
 }
-
-const (
-	pollInterval   = 2 * time.Second
-	reportInterval = 10 * time.Second
-	baseURL        = "http://localhost:8080"
-)
 
 // Report ..
 type Report struct {
@@ -43,29 +36,6 @@ type SelfMonitor struct {
 	runtime.MemStats
 }
 
-func (m *SelfMonitor) report() (string, error) {
-	if len(m.sendReports) < 1 {
-		return "", errors.New("no report")
-	}
-
-	var builder strings.Builder
-
-	builder.WriteString("type\tname\tvalue\tsize\tstatus")
-
-	for _, report := range m.sendReports {
-		str := fmt.Sprintf(
-			"\n%s\t%s\t%s\t%v",
-			report.typ,
-			report.name,
-			report.value,
-			report.status,
-		)
-		builder.WriteString(str)
-	}
-
-	return builder.String(), nil
-}
-
 // Collect ...
 func (m *SelfMonitor) Collect() {
 	time.Sleep(time.Duration(m.PollInterval) * time.Second)
@@ -77,7 +47,6 @@ func (m *SelfMonitor) Collect() {
 		m.pollCount++
 		m.sendReports = m.sendReports[:0]
 
-		log.Println("End of data collection")
 		time.Sleep(time.Duration(m.PollInterval) * time.Second)
 	}
 }
@@ -87,7 +56,7 @@ func (m *SelfMonitor) Send() {
 	client := resty.New()
 	time.Sleep(time.Duration(m.ReportInterval) * time.Second)
 	for {
-		log.Println("START of data SENDING", client)
+		log.Println("START of data SENDING")
 		m.sendPost("gauge", "Alloc", m.Alloc, client)
 		m.sendPost("gauge", "BuckHashSys", m.BuckHashSys, client)
 		m.sendPost("gauge", "Frees", m.Frees, client)
@@ -119,12 +88,6 @@ func (m *SelfMonitor) Send() {
 		m.sendPost("counter", "PollCount", m.pollCount, client)
 		m.pollCount = 0
 
-		_, err := m.report()
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		log.Println("End of data sending")
 		time.Sleep(time.Duration(m.ReportInterval) * time.Second)
 	}
 }
@@ -138,16 +101,12 @@ func (m *SelfMonitor) sendPost(typ, name string, val any, client *resty.Client) 
 	}
 	log.Println("Sending a request to:", URL)
 
-	log.Println("setting a connection...")
-
 	resp, err := client.R().
 		Post(URL)
 
 	if err != nil {
-		log.Println("There is no connection to the server")
+		log.Println("No connection:", err)
 	}
-
-	log.Println("The connection is established and data is data has been sent")
 
 	report := Report{
 		typ,
@@ -160,11 +119,8 @@ func (m *SelfMonitor) sendPost(typ, name string, val any, client *resty.Client) 
 }
 
 // Run ...
-func (m *SelfMonitor) Run() {
-	log.Println("\nmonitor running...")
-
+func (m *SelfMonitor) Perform() {
 	go m.Collect()
 	go m.Send()
-	log.Println("monitor is running")
 	select {}
 }

@@ -1,5 +1,5 @@
-// handlers тип сервера и привязанные к нему обработчики
-package handlers
+// server тип сервера и привязанные к нему обработчики
+package server
 
 import (
 	"fmt"
@@ -11,14 +11,8 @@ import (
 	"github.com/komogortzef/metrics/internal/storage"
 )
 
-// Server - конфигурация сервера.(сокет и тип хранилища)
-type Server struct {
-	Endpoint string
-	Store    storage.Storage
-}
-
-// SaveToMem сохранить в память(обработчик метода POST)
-func (h *Server) SaveToMem(resp http.ResponseWriter, req *http.Request) {
+// SaveToMem сохранить в память(обработчик метода POST).
+func (h *ServerConf) SaveToMem(resp http.ResponseWriter, req *http.Request) {
 	log.Println("SaveToMem handler")
 
 	tp := chi.URLParam(req, "tp")
@@ -33,8 +27,8 @@ func (h *Server) SaveToMem(resp http.ResponseWriter, req *http.Request) {
 	log.Println("SaveToMem completed")
 }
 
-// ShowAll обработчик метода GET
-func (h *Server) ShowAll(resp http.ResponseWriter, _ *http.Request) {
+// ShowAll обработчик метода GET.
+func (h *ServerConf) ShowAll(resp http.ResponseWriter, _ *http.Request) {
 	log.Println("ShowAll handler")
 
 	res := strings.Builder{}
@@ -59,8 +53,8 @@ func (h *Server) ShowAll(resp http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-// GetMetric обработчик метода GET
-func (h *Server) GetMetric(resp http.ResponseWriter, req *http.Request) {
+// GetMetric обработчик метода GET.
+func (h *ServerConf) GetMetric(resp http.ResponseWriter, req *http.Request) {
 	log.Println("GetMetric start..")
 
 	name := chi.URLParam(req, "name")
