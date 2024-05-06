@@ -1,28 +1,39 @@
 package main
 
 import (
+	"errors"
 	"flag"
-	"log"
 	"net/http"
+	"os"
+	"regexp"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/komogortzef/metrics/internal/handlers"
 	"github.com/komogortzef/metrics/internal/storage"
 )
 
-var srv handlers.Server
+var isHostPort = regexp.MustCompile(`^(.*):(\d+)$`)
 
 func run() error {
+
+	if len(os.Args) > 3 {
+		return errors.New("you must specify the endpoint: <./server -a host:port>")
+	}
+
+	var srv handlers.Config
 	srv.Store = storage.MemStorage{}
+
 	flag.StringVar(&srv.Endpoint, "a", "localhost:8080", "set Endpoint address: <host:port>")
 	flag.Parse()
-	log.Println("server address:", srv.Endpoint)
-	log.Println("storage:", srv.Store)
 
-	return http.ListenAndServe(srv.Endpoint, SetRouter())
+	if !isHostPort.MatchString(srv.Endpoint) {
+		return errors.New("the required format of the endpoint address: <host:port>")
+	}
+
+	return http.ListenAndServe(srv.Endpoint, SetRouter(&srv))
 }
 
-func SetRouter() chi.Router {
+func SetRouter(srv *handlers.Config) chi.Router {
 	r := chi.NewRouter()
 
 	r.Get("/", srv.ShowAll)
