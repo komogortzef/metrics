@@ -1,5 +1,3 @@
-// Package telemetry определены интерфейс и тип для сбора
-// телеметрии при помощи пакет runtime
 package telemetry
 
 import (
@@ -36,19 +34,13 @@ type Report struct {
 
 // SelfMonitor ...
 type SelfMonitor struct {
+	Endpoint       string
+	PollInterval   int
+	ReportInterval int
+	sendReports    []Report
+	randVal        float64
+	pollCount      int64
 	runtime.MemStats
-	randVal     float64
-	pollCount   int64
-	serverAddr  string
-	sendReports []Report
-}
-
-// NewSelfMonitor ...
-func NewSelfMonitor() *SelfMonitor {
-	var memSt runtime.MemStats
-
-	runtime.ReadMemStats(&memSt)
-	return &SelfMonitor{memSt, 0, 0, baseURL, []Report{}}
 }
 
 func (m *SelfMonitor) report() (string, error) {
@@ -76,26 +68,26 @@ func (m *SelfMonitor) report() (string, error) {
 
 // Collect ...
 func (m *SelfMonitor) Collect() {
-	time.Sleep(pollInterval)
+	time.Sleep(time.Duration(m.PollInterval) * time.Second)
 
 	for {
-		log.Println("\nstart of data collection")
+		log.Println("START of data COLLECTION")
 		runtime.ReadMemStats(&m.MemStats)
 		m.randVal = rand.Float64()
 		m.pollCount++
 		m.sendReports = m.sendReports[:0]
 
 		log.Println("End of data collection")
-		time.Sleep(pollInterval)
+		time.Sleep(time.Duration(m.PollInterval) * time.Second)
 	}
 }
 
 // Send ...
 func (m *SelfMonitor) Send() {
 	client := resty.New()
-	time.Sleep(reportInterval)
+	time.Sleep(time.Duration(m.ReportInterval) * time.Second)
 	for {
-		log.Println("\nStart of data sending", client)
+		log.Println("START of data SENDING", client)
 		m.sendPost("gauge", "Alloc", m.Alloc, client)
 		m.sendPost("gauge", "BuckHashSys", m.BuckHashSys, client)
 		m.sendPost("gauge", "Frees", m.Frees, client)
@@ -133,12 +125,17 @@ func (m *SelfMonitor) Send() {
 		}
 
 		log.Println("End of data sending")
-		time.Sleep(reportInterval)
+		time.Sleep(time.Duration(m.ReportInterval) * time.Second)
 	}
 }
 
 func (m *SelfMonitor) sendPost(typ, name string, val any, client *resty.Client) {
-	URL := fmt.Sprintf("%s/update/%s/%s/%v", m.serverAddr, typ, name, val)
+	var URL string
+	if !strings.Contains(m.Endpoint, "http://") {
+		URL = fmt.Sprintf("http://%s/update/%s/%s/%v", m.Endpoint, typ, name, val)
+	} else {
+		URL = fmt.Sprintf("%s/update/%s/%s/%v", m.Endpoint, typ, name, val)
+	}
 	log.Println("Sending a request to:", URL)
 
 	log.Println("setting a connection...")

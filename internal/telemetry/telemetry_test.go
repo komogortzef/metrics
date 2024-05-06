@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"runtime"
 	"testing"
 	"time"
 
@@ -21,12 +22,23 @@ func mockHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func newMockMonitor() SelfMonitor {
+	var st runtime.MemStats
+	runtime.ReadMemStats(&st)
+
+	return SelfMonitor{
+		PollInterval:   2,
+		ReportInterval: 10,
+		MemStats:       st,
+	}
+}
+
 func TestSend(t *testing.T) {
 	mockServ := httptest.NewServer(http.HandlerFunc(mockHandler))
 	defer mockServ.Close()
 
-	monitor := NewSelfMonitor()
-	monitor.serverAddr = mockServ.URL
+	monitor := newMockMonitor()
+	monitor.Endpoint = mockServ.URL
 
 	go monitor.Send()
 	time.Sleep(12 * time.Second)
@@ -35,7 +47,7 @@ func TestSend(t *testing.T) {
 }
 
 func TestCollect(t *testing.T) {
-	monitor := NewSelfMonitor()
+	monitor := newMockMonitor()
 
 	go monitor.Collect()
 	time.Sleep(3 * time.Second)

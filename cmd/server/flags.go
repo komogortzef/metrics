@@ -1,5 +1,4 @@
-// config конфигурация с помощью аргументов cmd и маршрутизация сервера
-package config
+package main
 
 import (
 	"flag"
@@ -13,22 +12,9 @@ import (
 
 var srv handlers.Server
 
-// привязка флагов к полям Server
-func init() {
+func run() error {
 	srv.Store = storage.MemStorage{}
-
 	flag.StringVar(&srv.Endpoint, "a", "localhost:8080", "set Endpoint address: <host:port>")
-
-	// пригодится когда будут добавлены новые экземпляры storage.Storage
-	flag.Func("s", "set storage type: <mem> or <db>", func(flagVal string) error {
-		log.Println("flag.Func starts performing...")
-		srv.Store = storage.MemStorage{}
-
-		return nil
-	})
-}
-
-func Run() error {
 	flag.Parse()
 	log.Println("server address:", srv.Endpoint)
 	log.Println("storage:", srv.Store)
