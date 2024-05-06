@@ -27,8 +27,8 @@ func newMockMonitor() SelfMonitor {
 	runtime.ReadMemStats(&st)
 
 	return SelfMonitor{
-		PollInterval:   2,
-		ReportInterval: 10,
+		reportInterval: 10,
+		pollInterval:   2,
 		MemStats:       st,
 	}
 }
@@ -38,7 +38,7 @@ func TestSend(t *testing.T) {
 	defer mockServ.Close()
 
 	monitor := newMockMonitor()
-	monitor.Endpoint = mockServ.URL
+	monitor.endpoint = mockServ.URL
 
 	go monitor.Send()
 	time.Sleep(12 * time.Second)

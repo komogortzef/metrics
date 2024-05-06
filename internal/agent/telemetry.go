@@ -1,15 +1,22 @@
 package agent
 
 import (
+	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
 )
+
+const maxArgs = 7
 
 type TelemetryProvider interface {
 	Collect()
@@ -27,9 +34,9 @@ type Report struct {
 
 // SelfMonitor ...
 type SelfMonitor struct {
-	Endpoint       string
-	PollInterval   int
-	ReportInterval int
+	endpoint       string
+	pollInterval   int
+	reportInterval int
 	sendReports    []Report
 	randVal        float64
 	pollCount      int64
@@ -38,23 +45,23 @@ type SelfMonitor struct {
 
 // Collect ...
 func (m *SelfMonitor) Collect() {
-	time.Sleep(time.Duration(m.PollInterval) * time.Second)
+	time.Sleep(time.Duration(m.pollInterval) * time.Second)
 
 	for {
-		log.Println("START of data COLLECTION")
+		//log.Println("START of data COLLECTION")
 		runtime.ReadMemStats(&m.MemStats)
 		m.randVal = rand.Float64()
 		m.pollCount++
 		m.sendReports = m.sendReports[:0]
 
-		time.Sleep(time.Duration(m.PollInterval) * time.Second)
+		time.Sleep(time.Duration(m.pollInterval) * time.Second)
 	}
 }
 
 // Send ...
 func (m *SelfMonitor) Send() {
 	client := resty.New()
-	time.Sleep(time.Duration(m.ReportInterval) * time.Second)
+	time.Sleep(time.Duration(m.reportInterval) * time.Second)
 	for {
 		log.Println("START of data SENDING")
 		m.sendPost("gauge", "Alloc", m.Alloc, client)
@@ -88,16 +95,16 @@ func (m *SelfMonitor) Send() {
 		m.sendPost("counter", "PollCount", m.pollCount, client)
 		m.pollCount = 0
 
-		time.Sleep(time.Duration(m.ReportInterval) * time.Second)
+		time.Sleep(time.Duration(m.reportInterval) * time.Second)
 	}
 }
 
 func (m *SelfMonitor) sendPost(typ, name string, val any, client *resty.Client) {
 	var URL string
-	if !strings.Contains(m.Endpoint, "http://") {
-		URL = fmt.Sprintf("http://%s/update/%s/%s/%v", m.Endpoint, typ, name, val)
+	if !strings.Contains(m.endpoint, "http://") {
+		URL = fmt.Sprintf("http://%s/update/%s/%s/%v", m.endpoint, typ, name, val)
 	} else {
-		URL = fmt.Sprintf("%s/update/%s/%s/%v", m.Endpoint, typ, name, val)
+		URL = fmt.Sprintf("%s/update/%s/%s/%v", m.endpoint, typ, name, val)
 	}
 	log.Println("Sending a request to:", URL)
 
@@ -123,4 +130,57 @@ func (m *SelfMonitor) Perform() {
 	go m.Collect()
 	go m.Send()
 	select {}
+}
+
+func (m *SelfMonitor) Configure() error {
+	if len(os.Args) > maxArgs {
+		return errors.New(`max number of configuration parameters(6): 
+			-a <host:port> -p <Poll Interval> -r <Report Interval>`)
+	}
+
+	addr, ok := os.LookupEnv("ADDRESS")
+	if !ok {
+		flag.StringVar(&m.endpoint, "a", "localhost:8080", "Endpoint address")
+	} else {
+		m.endpoint = addr
+	}
+
+	poll, ok := os.LookupEnv("POLL_INTERVAL")
+	if !ok {
+		flag.IntVar(&m.pollInterval, "p", 2, "Poll Interval")
+	} else {
+		num, _ := strconv.Atoi(poll)
+		m.pollInterval = num
+	}
+
+	rep, ok := os.LookupEnv("REPORT_INTERVAL")
+	if !ok {
+		flag.IntVar(&m.reportInterval, "r", 10, "Report Interval")
+	} else {
+		num, _ := strconv.Atoi(rep)
+		m.reportInterval = num
+	}
+
+	flag.Parse()
+
+	isHostPort := regexp.MustCompile(`^(.*):(\d+)$`)
+	if !isHostPort.MatchString(m.endpoint) {
+		return errors.New(
+			"the required format of the endpoint address: <host:port>")
+	}
+
+	return nil
+}
+
+func (m *SelfMonitor) ShowConfig() {
+	log.Printf("Monitor configuration:\nEndpoint: %s\nPoll Interval: %v\nReport Interval: %v",
+		m.endpoint, m.pollInterval, m.reportInterval)
+}
+
+func GetConfig() (SelfMonitor, error) {
+	agent := SelfMonitor{}
+	err := agent.Configure()
+	agent.ShowConfig()
+
+	return agent, err
 }
