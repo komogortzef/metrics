@@ -13,7 +13,6 @@ func main() {
 		panic(err)
 	}
 
-	srv.ShowConfig()
 	if err := http.ListenAndServe(srv.Endpoint, srv.GetRoutes()); err != nil {
 		panic(err)
 	}

@@ -32,15 +32,15 @@ func (srv *ServerConf) GetRoutes() chi.Router {
 	return r
 }
 
-func (srv *ServerConf) Configure() error {
+func (srv *ServerConf) configure() error {
 	if len(os.Args) > maxArgs {
 		return errors.New("you must specify the endpoint: <./server -a host:port>")
 	}
 
 	err := env.Parse(srv)
-	if err != nil {
-		log.Println("use cmd args")
-		flag.StringVar(&srv.Endpoint, "a", "localhost:8080", "set Endpoint address: <host:port>")
+	log.Println("error:", err)
+	if err != nil || srv.Endpoint == "" {
+		flag.StringVar(&srv.Endpoint, "a", "localhost:8080", "Endpoint address")
 		flag.Parse()
 	}
 
@@ -54,13 +54,9 @@ func (srv *ServerConf) Configure() error {
 	return nil
 }
 
-func (srv *ServerConf) ShowConfig() {
-	log.Printf("Server configuration:\nEndpoint: %s", srv.Endpoint)
-}
-
 func GetConfig() (ServerConf, error) {
 	srv := ServerConf{}
-	err := srv.Configure()
+	err := srv.configure()
 
 	return srv, err
 }

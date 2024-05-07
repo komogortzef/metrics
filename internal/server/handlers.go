@@ -12,7 +12,7 @@ import (
 )
 
 // SaveToMem сохранить в память(обработчик метода POST).
-func (h *ServerConf) SaveToMem(resp http.ResponseWriter, req *http.Request) {
+func (srv *ServerConf) SaveToMem(resp http.ResponseWriter, req *http.Request) {
 	log.Println("SaveToMem handler")
 
 	tp := chi.URLParam(req, "tp")
@@ -20,7 +20,7 @@ func (h *ServerConf) SaveToMem(resp http.ResponseWriter, req *http.Request) {
 	val := chi.URLParam(req, "val")
 
 	log.Println("saving data...")
-	err := h.Store.Save(tp, name, val)
+	err := srv.Store.Save(tp, name, val)
 	if err != nil {
 		http.Error(resp, "Bad Request", http.StatusBadRequest)
 	}
@@ -28,19 +28,21 @@ func (h *ServerConf) SaveToMem(resp http.ResponseWriter, req *http.Request) {
 }
 
 // ShowAll обработчик метода GET.
-func (h *ServerConf) ShowAll(resp http.ResponseWriter, _ *http.Request) {
+func (srv *ServerConf) ShowAll(resp http.ResponseWriter, _ *http.Request) {
 	log.Println("ShowAll handler")
 
 	res := strings.Builder{}
 
 	// в зависимости от типа хранилища выбираем логику извлечения данных
-	switch T := h.Store.(type) {
+	switch T := srv.Store.(type) {
 	case storage.MemStorage:
-		store, _ := h.Store.(storage.MemStorage)
+		store, _ := srv.Store.(storage.MemStorage)
 		for name, val := range store {
 			str := fmt.Sprintf("%s: %v\n", name, val)
 			res.WriteString(str)
 		}
+
+		resp.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, err := resp.Write([]byte(res.String()))
 		if err != nil {
 			log.Println(err)
@@ -54,15 +56,15 @@ func (h *ServerConf) ShowAll(resp http.ResponseWriter, _ *http.Request) {
 }
 
 // GetMetric обработчик метода GET.
-func (h *ServerConf) GetMetric(resp http.ResponseWriter, req *http.Request) {
+func (srv *ServerConf) GetMetric(resp http.ResponseWriter, req *http.Request) {
 	log.Println("GetMetric start..")
 
 	name := chi.URLParam(req, "name")
 
 	// в зависимости от типа хранилища выбираем логику извлечения данных
-	switch T := h.Store.(type) {
+	switch T := srv.Store.(type) {
 	case storage.MemStorage:
-		store, _ := h.Store.(storage.MemStorage)
+		store, _ := srv.Store.(storage.MemStorage)
 		val, ok := store[name]
 		if !ok {
 			resp.WriteHeader(http.StatusNotFound)

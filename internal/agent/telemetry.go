@@ -9,10 +9,10 @@ import (
 	"os"
 	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/caarlos0/env/v6"
 	"github.com/go-resty/resty/v2"
 )
 
@@ -24,7 +24,7 @@ type TelemetryProvider interface {
 	Perform()
 }
 
-// Report ..
+// Report включил скорее для тестов...
 type Report struct {
 	typ    string
 	name   string
@@ -32,36 +32,37 @@ type Report struct {
 	status int
 }
 
-// SelfMonitor ...
+// SelfMonitor объединил в тип данные из runtime, доп. значения в соответствии
+// с заданием и поля конфигурации агента
 type SelfMonitor struct {
-	endpoint       string
-	pollInterval   int
-	reportInterval int
+	Endpoint       string `env:"ADDRESS"`
+	PollInterval   int    `env:"POLL_INTERVAL"`
+	ReportInterval int    `env:"REPORT_INTERVAL"`
 	sendReports    []Report
 	randVal        float64
 	pollCount      int64
 	runtime.MemStats
 }
 
-// Collect ...
+// Collect. Сбор данных
 func (m *SelfMonitor) Collect() {
-	time.Sleep(time.Duration(m.pollInterval) * time.Second)
+	time.Sleep(time.Duration(m.PollInterval) * time.Second)
 
 	for {
-		//log.Println("START of data COLLECTION")
+		log.Println("START of data COLLECTION")
 		runtime.ReadMemStats(&m.MemStats)
 		m.randVal = rand.Float64()
 		m.pollCount++
 		m.sendReports = m.sendReports[:0]
 
-		time.Sleep(time.Duration(m.pollInterval) * time.Second)
+		time.Sleep(time.Duration(m.PollInterval) * time.Second)
 	}
 }
 
-// Send ...
+// Send отпарвка данных на сервер
 func (m *SelfMonitor) Send() {
 	client := resty.New()
-	time.Sleep(time.Duration(m.reportInterval) * time.Second)
+	time.Sleep(time.Duration(m.ReportInterval) * time.Second)
 	for {
 		log.Println("START of data SENDING")
 		m.sendPost("gauge", "Alloc", m.Alloc, client)
@@ -95,26 +96,27 @@ func (m *SelfMonitor) Send() {
 		m.sendPost("counter", "PollCount", m.pollCount, client)
 		m.pollCount = 0
 
-		time.Sleep(time.Duration(m.reportInterval) * time.Second)
+		time.Sleep(time.Duration(m.ReportInterval) * time.Second)
 	}
 }
 
+// отпарвка одной метрики
 func (m *SelfMonitor) sendPost(typ, name string, val any, client *resty.Client) {
 	var URL string
-	if !strings.Contains(m.endpoint, "http://") {
-		URL = fmt.Sprintf("http://%s/update/%s/%s/%v", m.endpoint, typ, name, val)
+	if !strings.Contains(m.Endpoint, "http://") {
+		URL = fmt.Sprintf("http://%s/update/%s/%s/%v", m.Endpoint, typ, name, val)
 	} else {
-		URL = fmt.Sprintf("%s/update/%s/%s/%v", m.endpoint, typ, name, val)
+		URL = fmt.Sprintf("%s/update/%s/%s/%v", m.Endpoint, typ, name, val)
 	}
 	log.Println("Sending a request to:", URL)
 
-	resp, err := client.R().
-		Post(URL)
+	resp, err := client.R().Post(URL)
 
 	if err != nil {
 		log.Println("No connection:", err)
 	}
 
+	// заполнение отчета
 	report := Report{
 		typ,
 		name,
@@ -125,62 +127,51 @@ func (m *SelfMonitor) sendPost(typ, name string, val any, client *resty.Client) 
 	m.sendReports = append(m.sendReports, report)
 }
 
-// Run ...
+// Запуск. плохо понимаю как это работет, но работает...
 func (m *SelfMonitor) Perform() {
 	go m.Collect()
 	go m.Send()
 	select {}
 }
 
-func (m *SelfMonitor) Configure() error {
+func (m *SelfMonitor) configure() error {
 	if len(os.Args) > maxArgs {
 		return errors.New(`max number of configuration parameters(6): 
 			-a <host:port> -p <Poll Interval> -r <Report Interval>`)
 	}
 
-	addr, ok := os.LookupEnv("ADDRESS")
-	if !ok {
-		flag.StringVar(&m.endpoint, "a", "localhost:8080", "Endpoint address")
-	} else {
-		m.endpoint = addr
+	err := env.Parse(m)
+	if err != nil {
+		return err
 	}
 
-	poll, ok := os.LookupEnv("POLL_INTERVAL")
-	if !ok {
-		flag.IntVar(&m.pollInterval, "p", 2, "Poll Interval")
-	} else {
-		num, _ := strconv.Atoi(poll)
-		m.pollInterval = num
-	}
-
-	rep, ok := os.LookupEnv("REPORT_INTERVAL")
-	if !ok {
-		flag.IntVar(&m.reportInterval, "r", 10, "Report Interval")
-	} else {
-		num, _ := strconv.Atoi(rep)
-		m.reportInterval = num
-	}
-
+	endpoint := flag.String("a", "localhost:8080", "input the endpoint address")
+	poll := flag.Int("p", 2, "input the poll interval")
+	rep := flag.Int("r", 10, "input the report interval")
 	flag.Parse()
 
+	// если данные не записались из окружения, то пишем из cmd(или по умолч)
+	switch {
+	case m.Endpoint == "":
+		m.Endpoint = *endpoint
+	case m.PollInterval == 0:
+		m.PollInterval = *poll
+	case m.ReportInterval == 0:
+		m.ReportInterval = *rep
+	}
+
 	isHostPort := regexp.MustCompile(`^(.*):(\d+)$`)
-	if !isHostPort.MatchString(m.endpoint) {
+	if !isHostPort.MatchString(m.Endpoint) {
 		return errors.New(
-			"the required format of the endpoint address: <host:port>")
+			"the required format of the Endpoint address: <host:port>")
 	}
 
 	return nil
 }
 
-func (m *SelfMonitor) ShowConfig() {
-	log.Printf("Monitor configuration:\nEndpoint: %s\nPoll Interval: %v\nReport Interval: %v",
-		m.endpoint, m.pollInterval, m.reportInterval)
-}
-
 func GetConfig() (SelfMonitor, error) {
 	agent := SelfMonitor{}
-	err := agent.Configure()
-	agent.ShowConfig()
+	err := agent.configure()
 
 	return agent, err
 }

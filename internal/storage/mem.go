@@ -13,7 +13,7 @@ type Storage interface {
 // MemStorage просто map
 type MemStorage map[string]any
 
-// Save ...
+// Save с проверкой релевантных для типа зн-ий
 func (s MemStorage) Save(data ...string) error {
 	log.Println("Start saving data...")
 
@@ -40,6 +40,7 @@ func (s MemStorage) Save(data ...string) error {
 			return StoreError{"Invalid counter value"}
 		}
 
+		// обновление(либо помещение в хранилище) зн-ия счетчика
 		if metVal, ok := s[metName].(int64); ok {
 			s[metName] = metVal + num
 		} else {
@@ -56,7 +57,7 @@ func (s MemStorage) Save(data ...string) error {
 	return nil
 }
 
-// StoreError ...
+// StoreError реализовал из-за придирок линтера
 type StoreError struct {
 	Err string
 }
