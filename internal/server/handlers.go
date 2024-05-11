@@ -1,83 +1,104 @@
-// server тип сервера и привязанные к нему обработчики
 package server
 
 import (
-	"fmt"
 	"log"
 	"net/http"
-	"strings"
+	"regexp"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/komogortzef/metrics/internal/storage"
 )
 
-// SaveToMem сохранить в память(обработчик метода POST).
-func (srv *ServerConf) SaveToMem(resp http.ResponseWriter, req *http.Request) {
-	log.Println("SaveToMem handler")
+const (
+	internalServerErrorMessage = "internal server error"
+	notFoundMessage            = "not found"
+	badRequestMessage          = "bad request"
+)
 
-	tp := chi.URLParam(req, "tp")
+type Operation func([]byte, []byte) ([]byte, error)
+
+type Repository interface {
+	Save(key string, value []byte, opers ...Operation) error
+	Get(key string) ([]byte, bool)
+	GetAll() map[string][]byte
+	Delete(key string) error
+}
+
+var STORAGE Repository
+
+func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
+	log.Println("UPDATE HANDLER")
 	name := chi.URLParam(req, "name")
 	val := chi.URLParam(req, "val")
 
-	log.Println("saving data...")
-	err := srv.Store.Save(tp, name, val)
-	if err != nil {
-		http.Error(resp, "Bad Request", http.StatusBadRequest)
-	}
-	log.Println("SaveToMem completed")
-}
-
-// ShowAll обработчик метода GET.
-func (srv *ServerConf) ShowAll(resp http.ResponseWriter, _ *http.Request) {
-	log.Println("ShowAll handler")
-
-	res := strings.Builder{}
-
-	// в зависимости от типа хранилища выбираем логику извлечения данных
-	switch T := srv.Store.(type) {
-	case storage.MemStorage:
-		store, _ := srv.Store.(storage.MemStorage)
-		for name, val := range store {
-			str := fmt.Sprintf("%s: %v\n", name, val)
-			res.WriteString(str)
-		}
-
-		resp.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, err := resp.Write([]byte(res.String()))
-		if err != nil {
-			log.Println(err)
-		}
-		log.Println("ShowAll completed")
-	default:
-		log.Println("Unknown type:", T)
-		resp.WriteHeader(http.StatusNotFound)
-		return
-	}
-}
-
-// GetMetric обработчик метода GET.
-func (srv *ServerConf) GetMetric(resp http.ResponseWriter, req *http.Request) {
-	log.Println("GetMetric start..")
-
-	name := chi.URLParam(req, "name")
-
-	// в зависимости от типа хранилища выбираем логику извлечения данных
-	switch T := srv.Store.(type) {
-	case storage.MemStorage:
-		store, _ := srv.Store.(storage.MemStorage)
-		val, ok := store[name]
-		if !ok {
-			resp.WriteHeader(http.StatusNotFound)
+	switch chi.URLParam(req, "kind") {
+	case "gauge":
+		isReal := regexp.MustCompile(`^-?\d*\.?\d+$`).MatchString
+		if !isReal(val) {
+			http.Error(rw, badRequestMessage, http.StatusBadRequest)
 			return
 		}
-		res := fmt.Sprintf("%v", val)
-		_, err := resp.Write([]byte(res))
-		if err != nil {
-			log.Println(err)
+		if err := STORAGE.Save(name, []byte(val)); err != nil {
+			http.Error(rw, internalServerErrorMessage, http.StatusInternalServerError)
+			return
+		}
+		log.Println(name, ":", val, ".", "The value is received")
+	case "counter":
+		isNatural := regexp.MustCompile(`^\d+$`).MatchString
+		if !isNatural(val) {
+			http.Error(rw, internalServerErrorMessage, http.StatusInternalServerError)
+			return
+		}
+		if err := STORAGE.Save(name, []byte(val), WithAccInt64); err != nil {
+			http.Error(rw, badRequestMessage, http.StatusBadRequest)
+			return
+		}
+		log.Println(name, ":", val, "\t", "the value is received")
+	default:
+		http.Error(rw, badRequestMessage, http.StatusBadRequest)
+	}
+}
+
+func GetHandler(rw http.ResponseWriter, req *http.Request) {
+	name := chi.URLParam(req, "name")
+
+	switch chi.URLParam(req, "kind") {
+	case "counter":
+		data, ok := STORAGE.Get(name)
+		if !ok {
+			http.Error(rw, notFoundMessage, http.StatusNotFound)
+			return
+		}
+		if bytes, err := rw.Write(data); err != nil {
+			log.Printf("failed to send data. size: %v\n", bytes)
+		}
+	case "gauge":
+		data, ok := STORAGE.Get(name)
+		if !ok {
+			http.Error(rw, notFoundMessage, http.StatusNotFound)
+			return
+		}
+		if bytes, err := rw.Write(data); err != nil {
+			log.Printf("failed to send data. size: %v\n", bytes)
 		}
 	default:
-		log.Println("Unknown type:", T)
-		resp.WriteHeader(http.StatusNotFound)
+		http.Error(rw, notFoundMessage, http.StatusNotFound)
+	}
+}
+
+func GetAllHandler(wr http.ResponseWriter, req *http.Request) {
+	list := []Item{}
+	for name, value := range STORAGE.GetAll() {
+		list = append(list, Item{Name: name, Value: string(value)})
+	}
+
+	html, err := renderGetAll(list)
+	if err != nil {
+		http.Error(wr, internalServerErrorMessage, http.StatusInternalServerError)
 		return
+	}
+
+	wr.Header().Set("Content-Type", "text/html")
+	if _, err := html.WriteTo(wr); err != nil {
+		http.Error(wr, internalServerErrorMessage, http.StatusInternalServerError)
 	}
 }

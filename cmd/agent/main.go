@@ -1,13 +1,11 @@
 package main
 
-import "github.com/komogortzef/metrics/internal/agent"
+import (
+	"metrics/internal/config"
+)
 
 func main() {
+	agent, _ := config.NewAgent(config.WithEnv, config.WithCmd)
 
-	agent, err := agent.GetConfig()
-	if err != nil {
-		panic(err)
-	}
-
-	agent.Perform()
+	agent.Run()
 }

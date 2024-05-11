@@ -1,19 +1,16 @@
 package main
 
 import (
-	"net/http"
-
-	"github.com/komogortzef/metrics/internal/server"
+	"metrics/internal/config"
 )
 
 func main() {
-
-	srv, err := server.GetConfig()
+	serv, err := config.NewServer(config.WithEnv, config.WithCmd)
 	if err != nil {
 		panic(err)
 	}
 
-	if err := http.ListenAndServe(srv.Endpoint, srv.GetRoutes()); err != nil {
+	if err = serv.ListenAndServe(); err != nil {
 		panic(err)
 	}
 }

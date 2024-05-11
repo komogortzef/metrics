@@ -1,4 +1,4 @@
-module github.com/komogortzef/metrics
+module metrics
 
 go 1.21.9
 
