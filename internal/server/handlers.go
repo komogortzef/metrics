@@ -25,7 +25,6 @@ type Repository interface {
 var STORAGE Repository
 
 func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
-	log.Println("UPDATE HANDLER")
 	name := chi.URLParam(req, "name")
 	val := chi.URLParam(req, "val")
 
@@ -44,7 +43,7 @@ func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 	case "counter":
 		isNatural := regexp.MustCompile(`^\d+$`).MatchString
 		if !isNatural(val) {
-			http.Error(rw, internalServerErrorMessage, http.StatusInternalServerError)
+			http.Error(rw, badRequestMessage, http.StatusBadRequest)
 			return
 		}
 		if err := STORAGE.Save(name, []byte(val), WithAccInt64); err != nil {

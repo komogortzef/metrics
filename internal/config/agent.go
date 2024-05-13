@@ -26,7 +26,7 @@ func NewAgent(opts ...Option) (TelemetryProvider, error) {
 	}
 
 	if len(os.Args) > maxArgsAgent {
-		fmt.Fprintln(os.Stderr, "\nInvalid set of args:")
+		fmt.Fprintln(os.Stderr, "\nInvalid set of args for agent:")
 		usage()
 		os.Exit(1)
 	}

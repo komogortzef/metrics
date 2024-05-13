@@ -16,6 +16,9 @@ func (ms *MemStorage) Save(key string, value []byte, opers ...Operation) error {
 
 	if len(opers) > 0 {
 		for _, oper := range opers {
+			if oper == nil {
+				continue
+			}
 			value, err = oper(ms.Items[key], value)
 		}
 	}

@@ -1,11 +1,8 @@
 package config
 
 import (
-	"flag"
-	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"sync"
 
 	"metrics/internal/server"
@@ -28,12 +25,12 @@ func NewServer(opts ...Option) (*http.Server, error) {
 	}
 
 	// проверка на нужный набор аргументов для сервера
-	parsedFlags := flag.NFlag()
-	if parsedFlags > maxArgsServer || len(os.Args) > 3 || parsedFlags == 1 && os.Args[1] != "-a" {
-		fmt.Fprintln(os.Stderr, "\nInvalid set of args:")
-		usage()
-		os.Exit(1)
-	}
+	// parsedFlags := flag.NFlag()
+	// if parsedFlags > maxArgsServer || len(os.Args) > 3 || parsedFlags == 1 && os.Args[1] != "-a" {
+	// 	fmt.Fprintln(os.Stderr, "\nInvalid set of args for server:")
+	// 	usage()
+	// 	os.Exit(1)
+	// }
 	if options.Address == "" {
 		options.Address = defaultAddr
 	}

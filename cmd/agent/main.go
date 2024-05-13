@@ -5,6 +5,10 @@ import (
 )
 
 func main() {
-	agent, _ := config.NewAgent(config.WithEnv, config.WithCmd)
+	agent, err := config.NewAgent(config.WithEnv, config.WithCmd)
+	if err != nil {
+		panic(err)
+	}
+
 	agent.Run()
 }
