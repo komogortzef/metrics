@@ -2,9 +2,6 @@ package config
 
 import (
 	"flag"
-	"fmt"
-	"log"
-	"os"
 	"regexp"
 
 	"github.com/caarlos0/env/v6"
@@ -32,7 +29,6 @@ type options struct {
 type Option func(*options)
 
 var WithEnv = func(o *options) {
-	log.Printf("FILL by ENV...")
 	err := env.Parse(o)
 	if err != nil {
 		panic(err)
@@ -50,12 +46,9 @@ var WithEnv = func(o *options) {
 }
 
 var WithCmd = func(o *options) {
-	log.Println("FILL by CMD...")
-
 	addrFlag := flag.String("a", defaultAddr, "Input the endpoint Address: <host:port>")
 	pollFlag := flag.Int("p", defaultPollInterval, "Input the poll interval: <sec>")
 	repFlag := flag.Int("r", defaultReportInterval, "Input the report interval: <sec>")
-	flag.Usage = usage
 	flag.Parse()
 
 	if o.state&addrArg == 0 {
@@ -76,11 +69,4 @@ var WithCmd = func(o *options) {
 			o.state |= reportArg
 		}
 	}
-}
-
-func usage() {
-	fmt.Fprintf(os.Stderr, "\nSERVER USAGE:\n")
-	fmt.Fprintf(os.Stderr, "  -a string\n  \tInput the andpoint addres: <host:port>\n")
-	fmt.Fprintf(os.Stderr, "\nAGENT USAGE:\n")
-	flag.PrintDefaults()
 }

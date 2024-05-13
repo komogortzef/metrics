@@ -7,16 +7,7 @@ import (
 	"log"
 )
 
-type Item struct {
-	Name  string
-	Value string
-}
-
-type templateArgs struct {
-	Data []Item
-}
-
-var getAllHTML = `<!DOCTYPE html>
+const getAllHTML = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -27,8 +18,16 @@ var getAllHTML = `<!DOCTYPE html>
 	<li>{{ .Name }} {{ .Value }}</li>{{ end }}
 	</ul>
   </body>
-</html>
-`
+</html>`
+
+type Item struct {
+	Name  string
+	Value string
+}
+
+type templateArgs struct {
+	Data []Item
+}
 
 func renderGetAll(data []Item) (*bytes.Buffer, error) {
 	indexTemplate := template.Must(template.New("metrics").Parse(getAllHTML))

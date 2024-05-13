@@ -13,20 +13,13 @@ import (
 )
 
 var (
-	ENDPOINT       = "localhost:8080"
-	POLLINTERVAL   = 2
-	REPORTINTERVAL = 10
+	Address        string
+	PollInterval   int
+	ReportInterval int
 )
 
-type metkind string
+const gauge = "gauge"
 
-const (
-	gauge   metkind = "gauge"
-	counter metkind = "counter"
-)
-
-// SelfMonitor объединил в тип данные из runtime, доп. Значения в соответствии
-// с заданием.
 type SelfMonitor struct {
 	runtime.MemStats
 	randVal     float64
@@ -35,7 +28,6 @@ type SelfMonitor struct {
 	Mtx         *sync.Mutex
 }
 
-// Collect. Сбор данных.
 func (m *SelfMonitor) Collect() {
 	for {
 		m.Mtx.Lock()
@@ -45,15 +37,15 @@ func (m *SelfMonitor) Collect() {
 		m.successSend = true
 		log.Printf("DATA COLLECTION: %v\n", m.pollCount)
 		m.Mtx.Unlock()
-		time.Sleep(time.Duration(POLLINTERVAL) * time.Second)
+
+		time.Sleep(time.Duration(PollInterval) * time.Second)
 	}
 }
 
-// Send отпарвка данных на сервер.
 func (m *SelfMonitor) Report() {
 	client := resty.New()
 	for {
-		time.Sleep(time.Duration(REPORTINTERVAL) * time.Second)
+		time.Sleep(time.Duration(ReportInterval) * time.Second)
 		log.Println("DATA SENDING")
 		m.Mtx.Lock()
 		m.send(gauge, "Alloc", m.Alloc, client)
@@ -84,7 +76,8 @@ func (m *SelfMonitor) Report() {
 		m.send(gauge, "Sys", m.Sys, client)
 		m.send(gauge, "TotalAlloc", m.TotalAlloc, client)
 		m.send(gauge, "RandomValue", m.randVal, client)
-		m.send(counter, "PollCount", m.pollCount, client)
+		m.send("counter", "PollCount", m.pollCount, client)
+
 		if m.successSend {
 			m.pollCount = 0
 			log.Println("ALL DATA HAS BEEN SEND SUCCESSFULLY")
@@ -94,14 +87,14 @@ func (m *SelfMonitor) Report() {
 }
 
 // отправка одной метрики.
-func (m *SelfMonitor) send(kind metkind, name string, val any, cl *resty.Client) {
+func (m *SelfMonitor) send(kind string, name string, val any, cl *resty.Client) {
 	var URL string
-	if !strings.Contains(ENDPOINT, "http://") {
-		URL = fmt.Sprintf("http://%s/update/%s/%s/%v", ENDPOINT, kind, name, val)
+
+	if !strings.Contains(Address, "http://") {
+		URL = fmt.Sprintf("http://%s/update/%s/%s/%v", Address, kind, name, val)
 	} else {
-		URL = fmt.Sprintf("%s/update/%s/%s/%v", ENDPOINT, kind, name, val)
+		URL = fmt.Sprintf("%s/update/%s/%s/%v", Address, kind, name, val)
 	}
-	log.Println("Sending a request to:", URL)
 
 	_, err := cl.R().Post(URL)
 	if err != nil {

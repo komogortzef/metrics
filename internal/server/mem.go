@@ -1,8 +1,8 @@
 package server
 
-import (
-	"sync"
-)
+import "sync"
+
+const metricsNumber = 29
 
 type MemStorage struct {
 	Items map[string][]byte
@@ -16,10 +16,9 @@ func (ms *MemStorage) Save(key string, value []byte, opers ...Operation) error {
 
 	if len(opers) > 0 {
 		for _, oper := range opers {
-			if oper == nil {
-				continue
+			if oper != nil {
+				value, err = oper(ms.Items[key], value)
 			}
-			value, err = oper(ms.Items[key], value)
 		}
 	}
 
@@ -30,12 +29,20 @@ func (ms *MemStorage) Save(key string, value []byte, opers ...Operation) error {
 
 func (ms *MemStorage) Get(key string) ([]byte, bool) {
 	ms.Mtx.RLock()
-	defer ms.Mtx.RUnlock()
 	val, ok := ms.Items[key]
+	ms.Mtx.RUnlock()
 
 	return val, ok
 }
 
 func (ms *MemStorage) GetAll() map[string][]byte {
-	return ms.Items
+	res := make(map[string][]byte, metricsNumber)
+
+	ms.Mtx.RLock()
+	for name, val := range ms.Items {
+		res[name] = val
+	}
+	ms.Mtx.RUnlock()
+
+	return res
 }

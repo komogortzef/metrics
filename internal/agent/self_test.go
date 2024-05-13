@@ -40,7 +40,7 @@ func TestReport(t *testing.T) {
 	defer mockServ.Close()
 
 	monitor := newMockMonitor()
-	ENDPOINT = mockServ.URL
+	Address = mockServ.URL
 
 	go monitor.Report()
 	time.Sleep(12 * time.Second)

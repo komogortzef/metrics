@@ -1,8 +1,6 @@
 package main
 
-import (
-	"metrics/internal/config"
-)
+import "metrics/internal/config"
 
 func main() {
 	serv, err := config.NewServer(config.WithEnv, config.WithCmd)

@@ -1,8 +1,6 @@
 package server
 
-import (
-	"strconv"
-)
+import "strconv"
 
 var WithAccInt64 = func(a []byte, b []byte) ([]byte, error) {
 	astr := string(a)

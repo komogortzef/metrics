@@ -1,16 +1,9 @@
 package config
 
 import (
-	"fmt"
-	"log"
-	"os"
 	"sync"
 
 	"metrics/internal/agent"
-)
-
-const (
-	maxArgsAgent = 7
 )
 
 type TelemetryProvider interface {
@@ -25,17 +18,9 @@ func NewAgent(opts ...Option) (TelemetryProvider, error) {
 		option(&options)
 	}
 
-	if len(os.Args) > maxArgsAgent {
-		fmt.Fprintln(os.Stderr, "\nInvalid set of args for agent:")
-		usage()
-		os.Exit(1)
-	}
-
-	agent.ENDPOINT = options.Address
-	agent.POLLINTERVAL = options.PollInterval
-	agent.REPORTINTERVAL = options.ReportInterval
-
-	log.Println(options)
+	agent.Address = options.Address
+	agent.PollInterval = options.PollInterval
+	agent.ReportInterval = options.ReportInterval
 
 	return &agent.SelfMonitor{Mtx: &sync.Mutex{}}, nil
 }

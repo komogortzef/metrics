@@ -1,7 +1,6 @@
 package config
 
 import (
-	"log"
 	"net/http"
 	"sync"
 
@@ -10,13 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-const (
-	maxArgsServer = 1
-
-	basePath   = "/"
-	getValPath = "/value/{kind}/{name}"
-	updatePath = "/update/{kind}/{name}/{val}"
-)
+const metricsNumber = 29
 
 func NewServer(opts ...Option) (*http.Server, error) {
 	var options options
@@ -24,35 +17,23 @@ func NewServer(opts ...Option) (*http.Server, error) {
 		opt(&options)
 	}
 
-	// проверка на нужный набор аргументов для сервера
-	// parsedFlags := flag.NFlag()
-	// if parsedFlags > maxArgsServer || len(os.Args) > 3 || parsedFlags == 1 && os.Args[1] != "-a" {
-	// 	fmt.Fprintln(os.Stderr, "\nInvalid set of args for server:")
-	// 	usage()
-	// 	os.Exit(1)
-	// }
-	if options.Address == "" {
-		options.Address = defaultAddr
-	}
-
 	server.STORAGE = &server.MemStorage{
-		Items: make(map[string][]byte),
+		Items: make(map[string][]byte, metricsNumber),
 		Mtx:   &sync.RWMutex{},
 	}
 	srv := &http.Server{
 		Addr:    options.Address,
 		Handler: getRoutes(),
 	}
-	log.Println("linstening on:", options.Address)
 
 	return srv, nil
 }
 
 func getRoutes() chi.Router {
 	r := chi.NewRouter()
-	r.Get(basePath, server.GetAllHandler)
-	r.Get(getValPath, server.GetHandler)
-	r.Post(updatePath, server.UpdateHandler)
+	r.Get("/", server.GetAllHandler)
+	r.Get("/value/{kind}/{name}", server.GetHandler)
+	r.Post("/update/{kind}/{name}/{val}", server.UpdateHandler)
 
 	return r
 }

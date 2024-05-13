@@ -84,7 +84,9 @@ func GetHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 func GetAllHandler(wr http.ResponseWriter, req *http.Request) {
-	list := []Item{}
+	list := make([]Item, 0, metricsNumber)
+
+	log.Println("GETALL HANDLER")
 	for name, value := range STORAGE.GetAll() {
 		list = append(list, Item{Name: name, Value: string(value)})
 	}
