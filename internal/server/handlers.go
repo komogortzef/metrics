@@ -20,7 +20,6 @@ type Repository interface {
 	Save(key string, value []byte, opers ...Operation) error
 	Get(key string) ([]byte, bool)
 	GetAll() map[string][]byte
-	Delete(key string) error
 }
 
 var STORAGE Repository

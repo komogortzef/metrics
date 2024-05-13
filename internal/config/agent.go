@@ -15,7 +15,7 @@ const (
 
 type TelemetryProvider interface {
 	Collect()
-	Send()
+	Report()
 	Run()
 }
 
@@ -37,5 +37,5 @@ func NewAgent(opts ...Option) (TelemetryProvider, error) {
 
 	log.Println(options)
 
-	return &agent.SelfMonitor{Mtx: &sync.RWMutex{}}, nil
+	return &agent.SelfMonitor{Mtx: &sync.Mutex{}}, nil
 }

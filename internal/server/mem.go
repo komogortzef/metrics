@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"sync"
 )
 
@@ -36,16 +35,4 @@ func (ms *MemStorage) Get(key string) ([]byte, bool) {
 
 func (ms *MemStorage) GetAll() map[string][]byte {
 	return ms.Items
-}
-
-func (ms *MemStorage) Delete(key string) error {
-	ms.Mtx.Lock()
-	defer ms.Mtx.Unlock()
-	delete(ms.Items, key)
-
-	if _, ok := ms.Items[key]; ok {
-		return errors.New("deletion failed")
-	}
-
-	return nil
 }

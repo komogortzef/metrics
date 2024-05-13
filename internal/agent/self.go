@@ -18,20 +18,21 @@ var (
 	REPORTINTERVAL = 10
 )
 
-type Kind string
+type metkind string
 
 const (
-	gauge   Kind = "gauge"
-	counter Kind = "counter"
+	gauge   metkind = "gauge"
+	counter metkind = "counter"
 )
 
 // SelfMonitor объединил в тип данные из runtime, доп. Значения в соответствии
 // с заданием.
 type SelfMonitor struct {
 	runtime.MemStats
-	randVal   float64
-	pollCount int64
-	Mtx       *sync.RWMutex
+	randVal     float64
+	pollCount   int64
+	successSend bool
+	Mtx         *sync.Mutex
 }
 
 // Collect. Сбор данных.
@@ -41,55 +42,59 @@ func (m *SelfMonitor) Collect() {
 		runtime.ReadMemStats(&m.MemStats)
 		m.randVal = rand.Float64()
 		m.pollCount++
-		m.Mtx.Unlock()
+		m.successSend = true
 		log.Printf("DATA COLLECTION: %v\n", m.pollCount)
+		m.Mtx.Unlock()
 		time.Sleep(time.Duration(POLLINTERVAL) * time.Second)
 	}
 }
 
 // Send отпарвка данных на сервер.
-func (m *SelfMonitor) Send() {
+func (m *SelfMonitor) Report() {
 	client := resty.New()
 	for {
 		time.Sleep(time.Duration(REPORTINTERVAL) * time.Second)
 		log.Println("DATA SENDING")
-		m.Mtx.RLock()
-		sendPost(gauge, "Alloc", m.Alloc, client)
-		sendPost(gauge, "BuckHashSys", m.BuckHashSys, client)
-		sendPost(gauge, "Frees", m.Frees, client)
-		sendPost(gauge, "GCPUFraction", m.GCCPUFraction, client)
-		sendPost(gauge, "GCSys", m.GCSys, client)
-		sendPost(gauge, "HeapAlloc", m.HeapAlloc, client)
-		sendPost(gauge, "HeapIdle", m.HeapIdle, client)
-		sendPost(gauge, "HeapInuse", m.HeapInuse, client)
-		sendPost(gauge, "HeapObjects", m.HeapObjects, client)
-		sendPost(gauge, "HeapReleased", m.HeapReleased, client)
-		sendPost(gauge, "HeapSys", m.HeapSys, client)
-		sendPost(gauge, "LastGC", m.LastGC, client)
-		sendPost(gauge, "Lookups", m.Lookups, client)
-		sendPost(gauge, "MCacheInuse", m.MCacheInuse, client)
-		sendPost(gauge, "MCacheSys", m.MCacheSys, client)
-		sendPost(gauge, "MSpanInuse", m.MSpanInuse, client)
-		sendPost(gauge, "MSpanSys", m.MSpanSys, client)
-		sendPost(gauge, "Mallocs", m.Mallocs, client)
-		sendPost(gauge, "NextGC", m.NextGC, client)
-		sendPost(gauge, "NumForcedGC", m.NumForcedGC, client)
-		sendPost(gauge, "NumGC", m.NumGC, client)
-		sendPost(gauge, "OtherSys", m.OtherSys, client)
-		sendPost(gauge, "PauseTotalNs", m.PauseTotalNs, client)
-		sendPost(gauge, "StackInuse", m.StackInuse, client)
-		sendPost(gauge, "StackSys", m.StackSys, client)
-		sendPost(gauge, "Sys", m.Sys, client)
-		sendPost(gauge, "TotalAlloc", m.TotalAlloc, client)
-		sendPost(gauge, "RandomValue", m.randVal, client)
-		sendPost(counter, "PollCount", m.pollCount, client)
-		m.Mtx.RUnlock()
-		m.pollCount = 0
+		m.Mtx.Lock()
+		m.send(gauge, "Alloc", m.Alloc, client)
+		m.send(gauge, "BuckHashSys", m.BuckHashSys, client)
+		m.send(gauge, "Frees", m.Frees, client)
+		m.send(gauge, "GCPUFraction", m.GCCPUFraction, client)
+		m.send(gauge, "GCSys", m.GCSys, client)
+		m.send(gauge, "HeapAlloc", m.HeapAlloc, client)
+		m.send(gauge, "HeapIdle", m.HeapIdle, client)
+		m.send(gauge, "HeapInuse", m.HeapInuse, client)
+		m.send(gauge, "HeapObjects", m.HeapObjects, client)
+		m.send(gauge, "HeapReleased", m.HeapReleased, client)
+		m.send(gauge, "HeapSys", m.HeapSys, client)
+		m.send(gauge, "LastGC", m.LastGC, client)
+		m.send(gauge, "Lookups", m.Lookups, client)
+		m.send(gauge, "MCacheInuse", m.MCacheInuse, client)
+		m.send(gauge, "MCacheSys", m.MCacheSys, client)
+		m.send(gauge, "MSpanInuse", m.MSpanInuse, client)
+		m.send(gauge, "MSpanSys", m.MSpanSys, client)
+		m.send(gauge, "Mallocs", m.Mallocs, client)
+		m.send(gauge, "NextGC", m.NextGC, client)
+		m.send(gauge, "NumForcedGC", m.NumForcedGC, client)
+		m.send(gauge, "NumGC", m.NumGC, client)
+		m.send(gauge, "OtherSys", m.OtherSys, client)
+		m.send(gauge, "PauseTotalNs", m.PauseTotalNs, client)
+		m.send(gauge, "StackInuse", m.StackInuse, client)
+		m.send(gauge, "StackSys", m.StackSys, client)
+		m.send(gauge, "Sys", m.Sys, client)
+		m.send(gauge, "TotalAlloc", m.TotalAlloc, client)
+		m.send(gauge, "RandomValue", m.randVal, client)
+		m.send(counter, "PollCount", m.pollCount, client)
+		if m.successSend {
+			m.pollCount = 0
+			log.Println("ALL DATA HAS BEEN SEND SUCCESSFULLY")
+		}
+		m.Mtx.Unlock()
 	}
 }
 
 // отправка одной метрики.
-func sendPost(kind Kind, name string, val any, client *resty.Client) {
+func (m *SelfMonitor) send(kind metkind, name string, val any, cl *resty.Client) {
 	var URL string
 	if !strings.Contains(ENDPOINT, "http://") {
 		URL = fmt.Sprintf("http://%s/update/%s/%s/%v", ENDPOINT, kind, name, val)
@@ -98,16 +103,16 @@ func sendPost(kind Kind, name string, val any, client *resty.Client) {
 	}
 	log.Println("Sending a request to:", URL)
 
-	_, err := client.R().Post(URL)
-
+	_, err := cl.R().Post(URL)
 	if err != nil {
 		log.Println("No connection:", err)
+		m.successSend = false
 	}
 }
 
 func (m *SelfMonitor) Run() {
 	go m.Collect()
-	go m.Send()
+	go m.Report()
 
 	select {}
 }

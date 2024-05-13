@@ -14,6 +14,8 @@ import (
 )
 
 const (
+	maxArgsServer = 1
+
 	basePath   = "/"
 	getValPath = "/value/{kind}/{name}"
 	updatePath = "/update/{kind}/{name}/{val}"
@@ -27,7 +29,7 @@ func NewServer(opts ...Option) (*http.Server, error) {
 
 	// проверка на нужный набор аргументов для сервера
 	parsedFlags := flag.NFlag()
-	if parsedFlags > 1 || len(os.Args) > 3 || parsedFlags == 1 && os.Args[1] != "-a" {
+	if parsedFlags > maxArgsServer || len(os.Args) > 3 || parsedFlags == 1 && os.Args[1] != "-a" {
 		fmt.Fprintln(os.Stderr, "\nInvalid set of args:")
 		usage()
 		os.Exit(1)
