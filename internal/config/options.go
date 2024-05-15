@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"regexp"
 
@@ -8,9 +9,11 @@ import (
 )
 
 const (
-	addrArg   = 1 // 001
-	pollArg   = 2 // 010
-	reportArg = 4 // 100
+	addrArg     = 1 // 001
+	pollArg     = 2 // 010
+	reportArg   = 4 // 100
+	fullConfig  = 7 // 111
+	emptyConfig = 0 // 000
 
 	defaultAddr           = "localhost:8080"
 	defaultPollInterval   = 2
@@ -26,12 +29,12 @@ type options struct {
 	state          uint8
 }
 
-type Option func(*options)
+type Option func(*options) error
 
-var WithEnv = func(o *options) {
+var WithEnv = func(o *options) error {
 	err := env.Parse(o)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	if isValidAddr(o.Address) {
@@ -43,9 +46,15 @@ var WithEnv = func(o *options) {
 	if o.ReportInterval > 0 {
 		o.state |= reportArg
 	}
+
+	if o.state == emptyConfig {
+		err = errors.New("there are no configuration options from the environment")
+	}
+
+	return err
 }
 
-var WithCmd = func(o *options) {
+var WithCmd = func(o *options) error {
 	addrFlag := flag.String("a", defaultAddr, "Input the endpoint Address: <host:port>")
 	pollFlag := flag.Int("p", defaultPollInterval, "Input the poll interval: <sec>")
 	repFlag := flag.Int("r", defaultReportInterval, "Input the report interval: <sec>")
@@ -69,4 +78,10 @@ var WithCmd = func(o *options) {
 			o.state |= reportArg
 		}
 	}
+
+	if o.state != fullConfig {
+		return errors.New("incomplete set of configuration options")
+	}
+
+	return nil
 }

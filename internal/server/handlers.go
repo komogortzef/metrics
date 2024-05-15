@@ -25,6 +25,7 @@ type Repository interface {
 
 var storage Repository
 
+// в будущем пригодится для конфигурирования хранилища
 func SetStorage(st string) {
 	switch st {
 	default:

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"net/http"
 
 	"metrics/internal/server"
@@ -8,12 +9,11 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-const metricsNumber = 29
-
 func NewServer(opts ...Option) (*http.Server, error) {
+	var err error
 	var options options
 	for _, opt := range opts {
-		opt(&options)
+		err = opt(&options)
 	}
 
 	server.SetStorage("mem")
@@ -22,8 +22,9 @@ func NewServer(opts ...Option) (*http.Server, error) {
 		Addr:    options.Address,
 		Handler: getRoutes(),
 	}
+	log.Println("serve and listen:", options.Address)
 
-	return srv, nil
+	return srv, err
 }
 
 func getRoutes() chi.Router {
