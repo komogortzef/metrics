@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -22,7 +23,17 @@ type Repository interface {
 	GetAll() map[string][]byte
 }
 
-var STORAGE Repository
+var storage Repository
+
+func SetStorage(st string) {
+	switch st {
+	default:
+		storage = &MemStorage{
+			Items: make(map[string][]byte, metricsNumber),
+			Mtx:   &sync.RWMutex{},
+		}
+	}
+}
 
 func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 	name := chi.URLParam(req, "name")
@@ -35,7 +46,7 @@ func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, badRequestMessage, http.StatusBadRequest)
 			return
 		}
-		if err := STORAGE.Save(name, []byte(val)); err != nil {
+		if err := storage.Save(name, []byte(val)); err != nil {
 			http.Error(rw, internalServerErrorMessage, http.StatusInternalServerError)
 			return
 		}
@@ -46,7 +57,7 @@ func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, badRequestMessage, http.StatusBadRequest)
 			return
 		}
-		if err := STORAGE.Save(name, []byte(val), WithAccInt64); err != nil {
+		if err := storage.Save(name, []byte(val), WithAccInt64); err != nil {
 			http.Error(rw, badRequestMessage, http.StatusBadRequest)
 			return
 		}
@@ -61,7 +72,7 @@ func GetHandler(rw http.ResponseWriter, req *http.Request) {
 
 	switch chi.URLParam(req, "kind") {
 	case "counter":
-		data, ok := STORAGE.Get(name)
+		data, ok := storage.Get(name)
 		if !ok {
 			http.Error(rw, notFoundMessage, http.StatusNotFound)
 			return
@@ -70,7 +81,7 @@ func GetHandler(rw http.ResponseWriter, req *http.Request) {
 			log.Printf("failed to send data. size: %v\n", bytes)
 		}
 	case "gauge":
-		data, ok := STORAGE.Get(name)
+		data, ok := storage.Get(name)
 		if !ok {
 			http.Error(rw, notFoundMessage, http.StatusNotFound)
 			return
@@ -87,7 +98,7 @@ func GetAllHandler(wr http.ResponseWriter, req *http.Request) {
 	list := make([]Item, 0, metricsNumber)
 
 	log.Println("GETALL HANDLER")
-	for name, value := range STORAGE.GetAll() {
+	for name, value := range storage.GetAll() {
 		list = append(list, Item{Name: name, Value: string(value)})
 	}
 

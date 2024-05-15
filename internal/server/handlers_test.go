@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -37,7 +36,7 @@ func TestHandlers(t *testing.T) {
 	r.Get("/value/{kind}/{name}", GetHandler)
 	r.Post("/update/{kind}/{name}/{val}", UpdateHandler)
 
-	STORAGE = &MemStorage{Items: make(map[string][]byte), Mtx: &sync.RWMutex{}}
+	SetStorage("mem")
 
 	tserv := httptest.NewServer(r)
 	defer tserv.Close()

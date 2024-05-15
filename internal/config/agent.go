@@ -18,9 +18,7 @@ func NewAgent(opts ...Option) (TelemetryProvider, error) {
 		option(&options)
 	}
 
-	agent.Address = options.Address
-	agent.PollInterval = options.PollInterval
-	agent.ReportInterval = options.ReportInterval
+	agent.SetParam(options.Address, options.PollInterval, options.ReportInterval)
 
 	return &agent.SelfMonitor{Mtx: &sync.Mutex{}}, nil
 }

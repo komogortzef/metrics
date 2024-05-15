@@ -2,7 +2,6 @@ package config
 
 import (
 	"net/http"
-	"sync"
 
 	"metrics/internal/server"
 
@@ -17,10 +16,8 @@ func NewServer(opts ...Option) (*http.Server, error) {
 		opt(&options)
 	}
 
-	server.STORAGE = &server.MemStorage{
-		Items: make(map[string][]byte, metricsNumber),
-		Mtx:   &sync.RWMutex{},
-	}
+	server.SetStorage("mem")
+
 	srv := &http.Server{
 		Addr:    options.Address,
 		Handler: getRoutes(),

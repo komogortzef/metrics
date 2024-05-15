@@ -13,10 +13,16 @@ import (
 )
 
 var (
-	Address        string
-	PollInterval   int
-	ReportInterval int
+	address        string
+	pollInterval   int
+	reportInterval int
 )
+
+func SetParam(addr string, poll, report int) {
+	address = addr
+	pollInterval = poll
+	reportInterval = report
+}
 
 const gauge = "gauge"
 
@@ -38,14 +44,14 @@ func (m *SelfMonitor) Collect() {
 		log.Printf("DATA COLLECTION: %v\n", m.pollCount)
 		m.Mtx.Unlock()
 
-		time.Sleep(time.Duration(PollInterval) * time.Second)
+		time.Sleep(time.Duration(pollInterval) * time.Second)
 	}
 }
 
 func (m *SelfMonitor) Report() {
 	client := resty.New()
 	for {
-		time.Sleep(time.Duration(ReportInterval) * time.Second)
+		time.Sleep(time.Duration(reportInterval) * time.Second)
 		log.Println("DATA SENDING")
 		m.Mtx.Lock()
 		m.send(gauge, "Alloc", m.Alloc, client)
@@ -90,10 +96,10 @@ func (m *SelfMonitor) Report() {
 func (m *SelfMonitor) send(kind string, name string, val any, cl *resty.Client) {
 	var URL string
 
-	if !strings.Contains(Address, "http://") {
-		URL = fmt.Sprintf("http://%s/update/%s/%s/%v", Address, kind, name, val)
+	if !strings.Contains(address, "http://") {
+		URL = fmt.Sprintf("http://%s/update/%s/%s/%v", address, kind, name, val)
 	} else {
-		URL = fmt.Sprintf("%s/update/%s/%s/%v", Address, kind, name, val)
+		URL = fmt.Sprintf("%s/update/%s/%s/%v", address, kind, name, val)
 	}
 
 	_, err := cl.R().Post(URL)
