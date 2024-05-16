@@ -12,19 +12,20 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
+const gauge = "gauge"
+
 var (
 	address        string
 	pollInterval   int
 	reportInterval int
 )
 
+// для установки глобальных переменных пакета agent из пакета config
 func SetParam(addr string, poll, report int) {
 	address = addr
 	pollInterval = poll
 	reportInterval = report
 }
-
-const gauge = "gauge"
 
 type SelfMonitor struct {
 	runtime.MemStats

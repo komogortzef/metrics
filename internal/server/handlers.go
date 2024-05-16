@@ -15,6 +15,7 @@ const (
 	badRequestMessage          = "bad request"
 )
 
+// для действий со значениями при сохранении в хранилище
 type Operation func([]byte, []byte) ([]byte, error)
 
 type Repository interface {

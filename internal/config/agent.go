@@ -19,6 +19,7 @@ func NewAgent(opts ...Option) (TelemetryProvider, error) {
 		err = option(&options)
 	}
 
+	// установка глобальных переменных в пакете agent
 	agent.SetParam(options.Address, options.PollInterval, options.ReportInterval)
 
 	return &agent.SelfMonitor{Mtx: &sync.Mutex{}}, err
