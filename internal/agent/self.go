@@ -2,14 +2,15 @@ package agent
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
+	"metrics/internal/logger"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"go.uber.org/zap"
 )
 
 const gauge = "gauge"
@@ -20,7 +21,6 @@ var (
 	reportInterval int
 )
 
-// для установки глобальных переменных пакета agent из пакета config
 func SetParam(addr string, poll, report int) {
 	address = addr
 	pollInterval = poll
@@ -42,7 +42,9 @@ func (m *SelfMonitor) Collect() {
 		m.randVal = rand.Float64()
 		m.pollCount++
 		m.successSend = true
-		log.Printf("DATA COLLECTION: %v\n", m.pollCount)
+		logger.Info("DATA COLLECTION",
+			zap.Int64("Poll Count", m.pollCount),
+		)
 		m.Mtx.Unlock()
 
 		time.Sleep(time.Duration(pollInterval) * time.Second)
@@ -53,7 +55,7 @@ func (m *SelfMonitor) Report() {
 	client := resty.New()
 	for {
 		time.Sleep(time.Duration(reportInterval) * time.Second)
-		log.Println("DATA SENDING")
+		logger.Info("DATA SENDING")
 		m.Mtx.Lock()
 		m.send(gauge, "Alloc", m.Alloc, client)
 		m.send(gauge, "BuckHashSys", m.BuckHashSys, client)
@@ -87,7 +89,8 @@ func (m *SelfMonitor) Report() {
 
 		if m.successSend {
 			m.pollCount = 0
-			log.Println("ALL DATA HAS BEEN SEND SUCCESSFULLY")
+			logger.Info("ALL DATA HAS BEEN SEND SUCCESSFULLY",
+				zap.Bool("success flag", m.successSend))
 		}
 		m.Mtx.Unlock()
 	}
@@ -105,7 +108,8 @@ func (m *SelfMonitor) send(kind string, name string, val any, cl *resty.Client) 
 
 	_, err := cl.R().Post(URL)
 	if err != nil {
-		log.Println("No connection:", err)
+		logger.Warn("Problems connecting to the server",
+			zap.String("error", err.Error()))
 		m.successSend = false
 	}
 }

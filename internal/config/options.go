@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"regexp"
 
 	"github.com/caarlos0/env/v6"
@@ -34,7 +35,7 @@ type Option func(*options) error
 var WithEnv = func(o *options) error {
 	err := env.Parse(o)
 	if err != nil {
-		return err
+		return fmt.Errorf("reading env param error: %w", err)
 	}
 
 	if isValidAddr(o.Address) {

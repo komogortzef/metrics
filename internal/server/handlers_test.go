@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -13,7 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testRequest(t *testing.T,
+func testRequest(
+	t *testing.T,
 	ts *httptest.Server,
 	method, path string) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, http.NoBody)
@@ -34,7 +34,7 @@ func TestHandlers(t *testing.T) {
 	r := chi.NewRouter()
 	r.Get("/", GetAllHandler)
 	r.Get("/value/{kind}/{name}", GetHandler)
-	r.Post("/update/{kind}/{name}/{val}", UpdateHandler)
+	r.Post("/update/{kind}/{name}/{val}", SaveHandler)
 
 	SetStorage("mem")
 
@@ -115,12 +115,9 @@ func TestHandlers(t *testing.T) {
 
 	for _, test := range tests {
 		log.Println("\n\nTEST NAME:", test.name)
-		resp, get := testRequest(t, tserv, test.method, test.url)
-		defer resp.Body.Close()
-		assert.Equal(t, test.expected, resp.StatusCode)
+		resp, _ := testRequest(t, tserv, test.method, test.url)
+		resp.Body.Close()
 
-		if test.method == http.MethodGet {
-			fmt.Println(get)
-		}
+		assert.Equal(t, test.expected, resp.StatusCode)
 	}
 }

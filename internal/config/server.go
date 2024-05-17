@@ -1,9 +1,10 @@
 package config
 
 import (
-	"log"
+	"fmt"
 	"net/http"
 
+	"metrics/internal/logger"
 	"metrics/internal/server"
 
 	"github.com/go-chi/chi/v5"
@@ -11,6 +12,12 @@ import (
 
 func NewServer(opts ...Option) (*http.Server, error) {
 	var err error
+	err = logger.InitLog()
+	if err != nil {
+		return nil, fmt.Errorf("init logger error: %w", err)
+	}
+
+	logger.Info("Applying configuration options...")
 	var options options
 	for _, opt := range opts {
 		err = opt(&options)
@@ -22,16 +29,20 @@ func NewServer(opts ...Option) (*http.Server, error) {
 		Addr:    options.Address,
 		Handler: getRoutes(),
 	}
-	log.Println("serve and listen:", options.Address)
 
 	return srv, err
 }
 
 func getRoutes() chi.Router {
+	logger.Info("Defining routes...")
 	r := chi.NewRouter()
+
+	r.Use(logger.WithHandlerLog)
+
 	r.Get("/", server.GetAllHandler)
 	r.Get("/value/{kind}/{name}", server.GetHandler)
-	r.Post("/update/{kind}/{name}/{val}", server.UpdateHandler)
+	r.Post("/update/{kind}/{name}/{val}", server.SaveHandler)
+	logger.Info("The routes are defined")
 
 	return r
 }
