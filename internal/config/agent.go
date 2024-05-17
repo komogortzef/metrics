@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"metrics/internal/agent"
+	"metrics/internal/logger"
 )
 
 type TelemetryProvider interface {
@@ -13,6 +14,11 @@ type TelemetryProvider interface {
 }
 
 func NewAgent(opts ...Option) (TelemetryProvider, error) {
+	if err := logger.InitLog(); err != nil {
+		return nil, err
+	}
+	logger.Info("Creating an agent...")
+
 	var err error
 	var options options
 	for _, option := range opts {

@@ -1,12 +1,14 @@
 package server
 
 import (
-	"log"
 	"net/http"
 	"regexp"
 	"sync"
 
+	"metrics/internal/logger"
+
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
 const (
@@ -28,6 +30,7 @@ var storage Repository
 
 // в будущем пригодится для конфигурирования хранилища
 func SetStorage(st string) {
+	logger.Info("Set storage ...")
 	switch st {
 	default:
 		storage = &MemStorage{
@@ -38,6 +41,7 @@ func SetStorage(st string) {
 }
 
 func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
+	logger.Info("UPDATE HANDLER starts ...")
 	name := chi.URLParam(req, "name")
 	val := chi.URLParam(req, "val")
 
@@ -45,6 +49,7 @@ func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 	case "gauge":
 		isReal := regexp.MustCompile(`^-?\d*\.?\d+$`).MatchString
 		if !isReal(val) {
+			logger.Warn("Invalid value for gauge metric")
 			http.Error(rw, badRequestMessage, http.StatusBadRequest)
 			return
 		}
@@ -52,10 +57,12 @@ func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, internalServerErrorMessage, http.StatusInternalServerError)
 			return
 		}
-		log.Println(name, ":", val, ".", "The value is received")
+		rw.WriteHeader(http.StatusOK)
+
 	case "counter":
 		isNatural := regexp.MustCompile(`^\d+$`).MatchString
 		if !isNatural(val) {
+			logger.Warn("Invalid value for counter metric")
 			http.Error(rw, badRequestMessage, http.StatusBadRequest)
 			return
 		}
@@ -63,55 +70,67 @@ func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, badRequestMessage, http.StatusBadRequest)
 			return
 		}
-		log.Println(name, ":", val, "\t", "the value is received")
+		rw.WriteHeader(http.StatusOK)
+
 	default:
+		logger.Warn("Invalid metric type")
 		http.Error(rw, badRequestMessage, http.StatusBadRequest)
 	}
 }
 
 func GetHandler(rw http.ResponseWriter, req *http.Request) {
+	logger.Info("GET HANDLER starts ...")
 	name := chi.URLParam(req, "name")
 
 	switch chi.URLParam(req, "kind") {
 	case "counter":
 		data, ok := storage.Get(name)
 		if !ok {
+			logger.Warn("There is no such metric")
 			http.Error(rw, notFoundMessage, http.StatusNotFound)
 			return
 		}
 		if bytes, err := rw.Write(data); err != nil {
-			log.Printf("failed to send data. size: %v\n", bytes)
+			logger.Warn("failed to send data. size", zap.Int("size", bytes))
 		}
+		rw.WriteHeader(http.StatusOK)
 	case "gauge":
 		data, ok := storage.Get(name)
 		if !ok {
+			logger.Warn("There is no such metric")
 			http.Error(rw, notFoundMessage, http.StatusNotFound)
 			return
 		}
 		if bytes, err := rw.Write(data); err != nil {
-			log.Printf("failed to send data. size: %v\n", bytes)
+			logger.Warn("failed to send data. size", zap.Int("size", bytes))
 		}
+		rw.WriteHeader(http.StatusOK)
 	default:
+		logger.Warn("Invalid metric type")
 		http.Error(rw, notFoundMessage, http.StatusNotFound)
 	}
 }
 
-func GetAllHandler(wr http.ResponseWriter, req *http.Request) {
+func GetAllHandler(rw http.ResponseWriter, req *http.Request) {
+	logger.Info("GET ALL HANDLER starts ...")
 	list := make([]Item, 0, metricsNumber)
 
-	log.Println("GETALL HANDLER")
+	logger.Info("Collect all metrics...")
 	for name, value := range storage.GetAll() {
 		list = append(list, Item{Name: name, Value: string(value)})
 	}
 
+	logger.Info("Creating an html page...")
 	html, err := renderGetAll(list)
 	if err != nil {
-		http.Error(wr, internalServerErrorMessage, http.StatusInternalServerError)
+		http.Error(rw, internalServerErrorMessage, http.StatusInternalServerError)
 		return
 	}
 
-	wr.Header().Set("Content-Type", "text/html")
-	if _, err := html.WriteTo(wr); err != nil {
-		http.Error(wr, internalServerErrorMessage, http.StatusInternalServerError)
+	rw.Header().Set("Content-Type", "text/html")
+	if _, err := html.WriteTo(rw); err != nil {
+		logger.Warn("The html page could not be sent")
+		http.Error(rw, internalServerErrorMessage, http.StatusInternalServerError)
 	}
+	rw.WriteHeader(http.StatusOK)
 }
