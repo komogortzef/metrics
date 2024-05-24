@@ -14,6 +14,7 @@ const getAllHTML = `<!DOCTYPE html>
     <title>Metrics list</title>
   </head>
   <body>
+  	<h1>All metrics</h1>
 	<ul>{{ range .Data}}
 	<li>{{ .Name }} {{ .Value }}</li>{{ end }}
 	</ul>

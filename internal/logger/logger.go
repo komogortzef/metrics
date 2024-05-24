@@ -31,33 +31,38 @@ func Fatal(msg string, fields ...zapcore.Field) {
 var logger *zap.Logger = zap.NewNop()
 
 func InitLog() error {
-	var err error
+	// Создаем zap.AtomicLevel и устанавливаем уровень логгирования на Debug
+	atomicLevel := zap.NewAtomicLevel()
+	atomicLevel.SetLevel(zapcore.DebugLevel)
 
-	level := zap.NewAtomicLevelAt(zapcore.InfoLevel)
-	level.SetLevel(zapcore.DebugLevel)
-
-	config := zap.NewProductionConfig()
-	config.Encoding = "console"
-	config.EncoderConfig = zapcore.EncoderConfig{
-		TimeKey:        "timestamp",
-		LevelKey:       "level",
-		NameKey:        "logger",
-		CallerKey:      "caller",
-		MessageKey:     "msg",
-		StacktraceKey:  "stacktrace",
-		LineEnding:     zapcore.DefaultLineEnding,
-		EncodeLevel:    zapcore.LowercaseLevelEncoder,
-		EncodeTime:     zapcore.ISO8601TimeEncoder,
-		EncodeDuration: zapcore.StringDurationEncoder,
-		EncodeCaller:   zapcore.ShortCallerEncoder,
+	config := zap.Config{
+		Level:       atomicLevel,
+		Development: false,
+		Encoding:    "console",
+		EncoderConfig: zapcore.EncoderConfig{
+			TimeKey:        "timestamp",
+			LevelKey:       "level",
+			NameKey:        "logger",
+			CallerKey:      "caller",
+			MessageKey:     "msg",
+			StacktraceKey:  "stacktrace",
+			LineEnding:     zapcore.DefaultLineEnding,
+			EncodeLevel:    zapcore.LowercaseLevelEncoder,
+			EncodeTime:     zapcore.ISO8601TimeEncoder,
+			EncodeDuration: zapcore.StringDurationEncoder,
+			EncodeCaller:   zapcore.ShortCallerEncoder,
+		},
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stderr"},
 	}
 
+	var err error
 	logger, err = config.Build()
 	if err != nil {
 		return fmt.Errorf("build config for logger error: %w", err)
 	}
 
-	logger.Info("Logger configured and running")
+	logger.Info("Logger configured and running with Debug level")
 	return nil
 }
 

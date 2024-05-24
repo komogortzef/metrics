@@ -10,6 +10,8 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+var router = chi.NewRouter()
+
 func NewServer(opts ...Option) (*http.Server, error) {
 	var err error
 	err = logger.InitLog()
@@ -27,24 +29,17 @@ func NewServer(opts ...Option) (*http.Server, error) {
 
 	srv := &http.Server{
 		Addr:    options.Address,
-		Handler: getRoutes(),
+		Handler: router,
 	}
 
 	return srv, err
 }
 
-func getRoutes() chi.Router {
-	logger.Info("Defining routes...")
-	r := chi.NewRouter()
-
-	r.Use(logger.WithHandlerLog)
-
-	r.Get("/", server.GetAllHandler)
-	r.Post("/value", server.GetJSON)
-	r.Get("/value/{kind}/{name}", server.GetHandler)
-	r.Post("/update", server.UpdateJSON)
-	r.Post("/update/{kind}/{name}/{val}", server.UpdateHandler)
-	logger.Info("The routes are defined")
-
-	return r
+func init() {
+	router.Use(logger.WithHandlerLog)
+	router.Get("/", server.GetAllHandler)
+	router.Post("/value/", server.GetJSON)
+	router.Get("/value/{kind}/{name}", server.GetHandler)
+	router.Post("/update/", server.UpdateJSON)
+	router.Post("/update/{kind}/{name}/{val}", server.UpdateHandler)
 }

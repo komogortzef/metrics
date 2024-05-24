@@ -6,6 +6,7 @@ package models
 import (
 	"bytes"
 	"fmt"
+
 	fflib "github.com/pquerna/ffjson/fflib/v1"
 )
 

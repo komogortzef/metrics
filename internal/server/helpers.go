@@ -1,9 +1,10 @@
 package server
 
 import (
-	"metrics/internal/logger"
 	"strconv"
 	"sync"
+
+	"metrics/internal/logger"
 )
 
 func withAccInt64(a []byte, b []byte) ([]byte, error) {

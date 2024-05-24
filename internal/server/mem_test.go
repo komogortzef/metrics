@@ -54,7 +54,7 @@ func TestSave(t *testing.T) {
 
 	for _, test := range tests {
 		log.Println("\n\nTEST:", test.name)
-		mem.Save(test.argName, test.argVal, test.argOper)
+		_ = mem.Save(test.argName, test.argVal, test.argOper)
 		log.Println("mem:", mem.Items)
 		log.Println("testMem:", test.want)
 		assert.Equal(t, mem.Items, test.want)

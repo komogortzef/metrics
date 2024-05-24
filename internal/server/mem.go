@@ -14,7 +14,6 @@ func (ms *MemStorage) Save(key string, value []byte, opers ...Operation) error {
 	ms.Mtx.Lock()
 	defer ms.Mtx.Unlock()
 
-	// если нужно произвести какие-либо действия со знчениями перед сохранением
 	if len(opers) > 0 {
 		for _, oper := range opers {
 			if oper != nil {

@@ -1,11 +1,10 @@
 package agent
 
 import (
-	"log"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -24,36 +23,29 @@ func mockHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func newMockMonitor() SelfMonitor {
-	var st runtime.MemStats
-	runtime.ReadMemStats(&st)
-
-	return SelfMonitor{
-		MemStats:    st,
-		Mtx:         &sync.Mutex{},
-		successSend: true,
-	}
-}
-
 func TestReport(t *testing.T) {
 	mockServ := httptest.NewServer(http.HandlerFunc(mockHandler))
 	defer mockServ.Close()
 
-	monitor := newMockMonitor()
+	monitor := SelfMonitor{
+		Mtx: &sync.RWMutex{},
+	}
 	address = mockServ.URL
 
 	go monitor.Report()
-	time.Sleep(12 * time.Second)
+	time.Sleep(time.Duration(reportInterval)*time.Second + 1)
 
-	log.Println("success flag:", monitor.successSend)
-	assert.Equal(t, monitor.successSend, true)
+	fmt.Println(successSend)
+	assert.NotEqual(t, false, successSend)
 }
 
 func TestCollect(t *testing.T) {
-	monitor := newMockMonitor()
+	monitor := SelfMonitor{
+		Mtx: &sync.RWMutex{},
+	}
 
 	go monitor.Collect()
-	time.Sleep(3 * time.Second)
+	time.Sleep(time.Duration(pollInterval)*time.Second + 1)
 
 	assert.NotZero(t, monitor.Alloc)
 	assert.NotZero(t, monitor.pollCount)

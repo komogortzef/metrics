@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	internalServerErrorMessage = "internal server error"
-	notFoundMessage            = "not found"
-	badRequestMessage          = "bad request"
-	gauge                      = "gauge"
-	counter                    = "counter"
+	internalErrorMsg  = "internal server error"
+	notFoundMessage   = "not found"
+	badRequestMessage = "bad request"
+	gauge             = "gauge"
+	counter           = "counter"
 )
 
 type Operation func([]byte, []byte) ([]byte, error)
@@ -29,7 +29,7 @@ type Repository interface {
 var storage Repository
 
 func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
-	logger.Info("UPDATE HANDLER starts ...")
+	logger.Debug("UPDATE HANDLER starts ...")
 
 	kind := chi.URLParam(req, "kind")
 	name := chi.URLParam(req, "name")
@@ -39,20 +39,19 @@ func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 	case gauge:
 		isReal := regexp.MustCompile(`^-?\d*\.?\d+$`).MatchString
 		if !isReal(val) {
-			logger.Warn("Invalid value for gauge metric")
+			logger.Warn("Invalid value for gauge", zap.String("val", val))
 			http.Error(rw, badRequestMessage, http.StatusBadRequest)
 			return
 		}
 		if err := storage.Save(name, []byte(val)); err != nil {
-			http.Error(rw, internalServerErrorMessage, http.StatusInternalServerError)
+			http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
 			return
 		}
 		rw.WriteHeader(http.StatusOK)
-
 	case counter:
 		isNatural := regexp.MustCompile(`^\d+$`).MatchString
 		if !isNatural(val) {
-			logger.Warn("Invalid value for counter metric")
+			logger.Warn("Invalid value for counter")
 			http.Error(rw, badRequestMessage, http.StatusBadRequest)
 			return
 		}
@@ -61,7 +60,6 @@ func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 		rw.WriteHeader(http.StatusOK)
-
 	default:
 		logger.Warn("Invalid metric type")
 		http.Error(rw, badRequestMessage, http.StatusBadRequest)
@@ -69,7 +67,7 @@ func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 func GetHandler(rw http.ResponseWriter, req *http.Request) {
-	logger.Info("GET HANDLER starts ...")
+	logger.Debug("GET HANDLER starts ...")
 	name := chi.URLParam(req, "name")
 
 	switch chi.URLParam(req, "kind") {
@@ -91,10 +89,8 @@ func GetHandler(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, notFoundMessage, http.StatusNotFound)
 			return
 		}
-		if bytes, err := rw.Write(data); err != nil {
-			logger.Warn("failed to send data. size", zap.Int("size", bytes))
-		}
 		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write(data)
 	default:
 		logger.Warn("Invalid metric type")
 		http.Error(rw, notFoundMessage, http.StatusNotFound)
@@ -102,7 +98,7 @@ func GetHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 func GetAllHandler(rw http.ResponseWriter, req *http.Request) {
-	logger.Info("GET ALL HANDLER starts ...")
+	logger.Debug("GET ALL HANDLER starts ...")
 	list := make([]Item, 0, metricsNumber)
 
 	logger.Info("Collect all metrics...")
@@ -113,15 +109,12 @@ func GetAllHandler(rw http.ResponseWriter, req *http.Request) {
 	logger.Info("Creating an html page...")
 	html, err := renderGetAll(list)
 	if err != nil {
-		logger.Warn("While html rendiring error occured")
-		http.Error(rw, internalServerErrorMessage, http.StatusInternalServerError)
+		logger.Warn("An error occured during html rendering")
+		http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
 		return
 	}
 
 	rw.Header().Set("Content-Type", "text/html")
-	if _, err = rw.Write(html.Bytes()); err != nil {
-		logger.Warn("The html page could not be sent", zap.String("err", err.Error()))
-		http.Error(rw, internalServerErrorMessage, http.StatusInternalServerError)
-	}
 	rw.WriteHeader(http.StatusOK)
+	_, _ = rw.Write(html.Bytes())
 }

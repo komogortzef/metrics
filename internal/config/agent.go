@@ -8,17 +8,16 @@ import (
 	"metrics/internal/logger"
 )
 
-type TelemetryProvider interface {
+type Telemetry interface {
 	Collect()
 	Report()
-	Run()
 }
 
-func NewAgent(opts ...Option) (TelemetryProvider, error) {
+func NewAgent(opts ...Option) (Telemetry, error) {
 	if err := logger.InitLog(); err != nil {
 		return nil, fmt.Errorf("init logger error: %w", err)
 	}
-	logger.Info("Creating an agent...")
+	logger.Debug("Creating an agent...")
 
 	var err error
 	var options options
@@ -26,8 +25,7 @@ func NewAgent(opts ...Option) (TelemetryProvider, error) {
 		err = option(&options)
 	}
 
-	// установка глобальных переменных в пакете agent
-	agent.SetParam(options.Address, options.PollInterval, options.ReportInterval)
+	agent.SetCond(options.Address, "json", options.PollInterval, options.ReportInterval)
 
-	return &agent.SelfMonitor{Mtx: &sync.Mutex{}}, err
+	return &agent.SelfMonitor{Mtx: &sync.RWMutex{}}, err
 }

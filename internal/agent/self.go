@@ -1,38 +1,23 @@
 package agent
 
 import (
-	"fmt"
 	"math/rand"
-	"metrics/internal/logger"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
+	"metrics/internal/logger"
+
 	"github.com/go-resty/resty/v2"
-	"go.uber.org/zap"
 )
 
 const gauge = "gauge"
 
-var (
-	address        string
-	pollInterval   int
-	reportInterval int
-)
-
-func SetParam(addr string, poll, report int) {
-	address = addr
-	pollInterval = poll
-	reportInterval = report
-}
-
 type SelfMonitor struct {
 	runtime.MemStats
-	randVal     float64
-	pollCount   int64
-	successSend bool
-	Mtx         *sync.Mutex
+	randVal   float64
+	pollCount int64
+	Mtx       *sync.RWMutex
 }
 
 func (m *SelfMonitor) Collect() {
@@ -41,82 +26,52 @@ func (m *SelfMonitor) Collect() {
 		runtime.ReadMemStats(&m.MemStats)
 		m.randVal = rand.Float64()
 		m.pollCount++
-		m.successSend = true
-		logger.Info("DATA COLLECTION",
-			zap.Int64("Poll Count", m.pollCount),
-		)
+		successSend = true
+		logger.Info("collect...")
 		m.Mtx.Unlock()
-
 		time.Sleep(time.Duration(pollInterval) * time.Second)
 	}
 }
 
 func (m *SelfMonitor) Report() {
-	client := resty.New()
+	client := resty.New().SetBaseURL("http://" + address)
 	for {
 		time.Sleep(time.Duration(reportInterval) * time.Second)
-		logger.Info("DATA SENDING")
-		m.Mtx.Lock()
-		m.send(gauge, "Alloc", m.Alloc, client)
-		m.send(gauge, "BuckHashSys", m.BuckHashSys, client)
-		m.send(gauge, "Frees", m.Frees, client)
-		m.send(gauge, "GCPUFraction", m.GCCPUFraction, client)
-		m.send(gauge, "GCSys", m.GCSys, client)
-		m.send(gauge, "HeapAlloc", m.HeapAlloc, client)
-		m.send(gauge, "HeapIdle", m.HeapIdle, client)
-		m.send(gauge, "HeapInuse", m.HeapInuse, client)
-		m.send(gauge, "HeapObjects", m.HeapObjects, client)
-		m.send(gauge, "HeapReleased", m.HeapReleased, client)
-		m.send(gauge, "HeapSys", m.HeapSys, client)
-		m.send(gauge, "LastGC", m.LastGC, client)
-		m.send(gauge, "Lookups", m.Lookups, client)
-		m.send(gauge, "MCacheInuse", m.MCacheInuse, client)
-		m.send(gauge, "MCacheSys", m.MCacheSys, client)
-		m.send(gauge, "MSpanInuse", m.MSpanInuse, client)
-		m.send(gauge, "MSpanSys", m.MSpanSys, client)
-		m.send(gauge, "Mallocs", m.Mallocs, client)
-		m.send(gauge, "NextGC", m.NextGC, client)
-		m.send(gauge, "NumForcedGC", m.NumForcedGC, client)
-		m.send(gauge, "NumGC", m.NumGC, client)
-		m.send(gauge, "OtherSys", m.OtherSys, client)
-		m.send(gauge, "PauseTotalNs", m.PauseTotalNs, client)
-		m.send(gauge, "StackInuse", m.StackInuse, client)
-		m.send(gauge, "StackSys", m.StackSys, client)
-		m.send(gauge, "Sys", m.Sys, client)
-		m.send(gauge, "TotalAlloc", m.TotalAlloc, client)
-		m.send(gauge, "RandomValue", m.randVal, client)
-		m.send("counter", "PollCount", m.pollCount, client)
-
-		if m.successSend {
+		logger.Info("sending...")
+		m.Mtx.RLock()
+		send(gauge, "Alloc", float64(m.Alloc), client)
+		send(gauge, "BuckHashSys", float64(m.BuckHashSys), client)
+		send(gauge, "Frees", float64(m.Frees), client)
+		send(gauge, "GCPUFraction", float64(m.GCCPUFraction), client)
+		send(gauge, "GCSys", float64(m.GCSys), client)
+		send(gauge, "HeapAlloc", float64(m.HeapAlloc), client)
+		send(gauge, "HeapIdle", float64(m.HeapIdle), client)
+		send(gauge, "HeapInuse", float64(m.HeapInuse), client)
+		send(gauge, "HeapObjects", float64(m.HeapObjects), client)
+		send(gauge, "HeapReleased", float64(m.HeapReleased), client)
+		send(gauge, "HeapSys", float64(m.HeapSys), client)
+		send(gauge, "LastGC", float64(m.LastGC), client)
+		send(gauge, "Lookups", float64(m.Lookups), client)
+		send(gauge, "MCacheInuse", float64(m.MCacheInuse), client)
+		send(gauge, "MCacheSys", float64(m.MCacheSys), client)
+		send(gauge, "MSpanInuse", float64(m.MSpanInuse), client)
+		send(gauge, "MSpanSys", float64(m.MSpanSys), client)
+		send(gauge, "Mallocs", float64(m.Mallocs), client)
+		send(gauge, "NextGC", float64(m.NextGC), client)
+		send(gauge, "NumForcedGC", float64(m.NumForcedGC), client)
+		send(gauge, "NumGC", float64(m.NumGC), client)
+		send(gauge, "OtherSys", float64(m.OtherSys), client)
+		send(gauge, "PauseTotalNs", float64(m.PauseTotalNs), client)
+		send(gauge, "StackInuse", float64(m.StackInuse), client)
+		send(gauge, "StackSys", float64(m.StackSys), client)
+		send(gauge, "Sys", float64(m.Sys), client)
+		send(gauge, "TotalAlloc", float64(m.TotalAlloc), client)
+		send(gauge, "RandomValue", float64(m.randVal), client)
+		send("counter", "PollCount", m.pollCount, client)
+		if successSend {
 			m.pollCount = 0
-			logger.Info("ALL DATA HAS BEEN SEND SUCCESSFULLY",
-				zap.Bool("success flag", m.successSend))
+			logger.Info("success sending")
 		}
-		m.Mtx.Unlock()
+		m.Mtx.RUnlock()
 	}
-}
-
-// отправка одной метрики.
-func (m *SelfMonitor) send(kind string, name string, val any, cl *resty.Client) {
-	var URL string
-
-	if !strings.Contains(address, "http://") {
-		URL = fmt.Sprintf("http://%s/update/%s/%s/%v", address, kind, name, val)
-	} else {
-		URL = fmt.Sprintf("%s/update/%s/%s/%v", address, kind, name, val)
-	}
-
-	_, err := cl.R().Post(URL)
-	if err != nil {
-		logger.Warn("Problems connecting to the server",
-			zap.String("error", err.Error()))
-		m.successSend = false
-	}
-}
-
-func (m *SelfMonitor) Run() {
-	go m.Collect()
-	go m.Report()
-
-	select {}
 }
