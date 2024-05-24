@@ -40,8 +40,10 @@ func getRoutes() chi.Router {
 	r.Use(logger.WithHandlerLog)
 
 	r.Get("/", server.GetAllHandler)
+	r.Post("/value", server.GetJSON)
 	r.Get("/value/{kind}/{name}", server.GetHandler)
-	r.Post("/update/{kind}/{name}/{val}", server.SaveHandler)
+	r.Post("/update", server.UpdateJSON)
+	r.Post("/update/{kind}/{name}/{val}", server.UpdateHandler)
 	logger.Info("The routes are defined")
 
 	return r

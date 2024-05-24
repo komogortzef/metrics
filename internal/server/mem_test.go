@@ -34,7 +34,7 @@ func TestSave(t *testing.T) {
 			name:    "to save counter value",
 			argName: "Counter",
 			argVal:  []byte("1"),
-			argOper: WithAccInt64,
+			argOper: withAccInt64,
 			want: map[string][]byte{
 				"Gauge":   []byte("1.44"),
 				"Counter": []byte("1"),
@@ -44,7 +44,7 @@ func TestSave(t *testing.T) {
 			name:    "to save counter one more time",
 			argName: "Counter",
 			argVal:  []byte("1"),
-			argOper: WithAccInt64,
+			argOper: withAccInt64,
 			want: map[string][]byte{
 				"Gauge":   []byte("1.44"),
 				"Counter": []byte("2"),
