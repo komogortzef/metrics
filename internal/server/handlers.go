@@ -79,7 +79,6 @@ func GetAllHandler(rw http.ResponseWriter, req *http.Request) {
 		list = append(list, Item{Name: key, Value: bytesToString(key, bytes)})
 	}
 
-	logger.Info("Creating an html page...")
 	html, err := renderGetAll(list)
 	if err != nil {
 		logger.Warn("An error occured during html rendering")

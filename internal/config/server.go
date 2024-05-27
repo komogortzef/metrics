@@ -19,7 +19,6 @@ func NewServer(opts ...Option) (*http.Server, error) {
 		return nil, fmt.Errorf("init logger error: %w", err)
 	}
 
-	logger.Info("Applying configuration options...")
 	var options options
 	for _, opt := range opts {
 		err = opt(&options)

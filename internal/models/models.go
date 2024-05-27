@@ -29,15 +29,17 @@ func (a *MetricAccount) Put(kind, name string) {
 	a.gauges[name] = struct{}{}
 }
 
-func (a *MetricAccount) List() []string {
-	list := make([]string, MetricsNumber)
-
+func (a *MetricAccount) List() (list [MetricsNumber]string) {
+	index := 0
 	for key := range a.gauges {
-		list = append(list, key)
+		list[index] = key
+		index++
 	}
 
+	index--
 	for key := range a.counters {
-		list = append(list, key)
+		list[index] = key
+		index++
 	}
 
 	return list

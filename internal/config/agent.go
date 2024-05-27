@@ -17,7 +17,6 @@ func NewAgent(opts ...Option) (Telemetry, error) {
 	if err := logger.InitLog(); err != nil {
 		return nil, fmt.Errorf("init logger error: %w", err)
 	}
-	logger.Debug("Creating an agent...")
 
 	var err error
 	var options options

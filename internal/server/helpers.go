@@ -12,6 +12,8 @@ import (
 	"metrics/internal/models"
 )
 
+const bitSize = 8
+
 func SetStorage(st string) {
 	logger.Info("Set storage...")
 	switch st {
@@ -36,7 +38,7 @@ func accInt64(a []byte, b []byte) []byte {
 }
 
 func toBytes(kind, val any) ([]byte, error) {
-	bytes := make([]byte, 8)
+	bytes := make([]byte, bitSize)
 
 	switch v := val.(type) {
 	case models.Metrics:
@@ -58,14 +60,14 @@ func toBytes(kind, val any) ([]byte, error) {
 		if kind == gauge {
 			v, err := strconv.ParseFloat(num, 64)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("cannot parse float: %w", err)
 			}
 			binary.LittleEndian.PutUint64(bytes, math.Float64bits(v))
 			return bytes, nil
 		} else if kind == counter {
 			v, err := strconv.ParseInt(num, 10, 64)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("cannot parse int: %w", err)
 			}
 			binary.LittleEndian.PutUint64(bytes, uint64(v))
 			return bytes, nil
@@ -79,7 +81,7 @@ func bytesToString(name string, val []byte) string {
 	var res string
 
 	if models.IsCounter(name) {
-		res = fmt.Sprintf("%v", int64(binary.LittleEndian.Uint64(val)))
+		res = strconv.FormatInt(int64(binary.LittleEndian.Uint64(val)), 10)
 	} else {
 		res = strconv.FormatFloat(
 			math.Float64frombits(binary.LittleEndian.Uint64(val)), 'g', -1, 64)

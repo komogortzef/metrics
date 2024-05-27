@@ -3,7 +3,6 @@ package server
 import (
 	"sync"
 
-	"metrics/internal/logger"
 	"metrics/internal/models"
 )
 
@@ -13,7 +12,6 @@ type MemStorage struct {
 }
 
 func (ms *MemStorage) Update(key string, value []byte) error {
-	logger.Info("Save mem")
 	ms.Mtx.Lock()
 	defer ms.Mtx.Unlock()
 	if models.IsCounter(key) {
