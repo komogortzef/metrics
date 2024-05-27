@@ -2,12 +2,11 @@ package server
 
 import (
 	"net/http"
-	"regexp"
 
 	"metrics/internal/logger"
+	"metrics/internal/models"
 
 	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 )
 
 const (
@@ -18,12 +17,9 @@ const (
 	counter           = "counter"
 )
 
-type Operation func([]byte, []byte) ([]byte, error)
-
 type Repository interface {
-	Save(key string, value []byte, opers ...Operation) error
+	Update(key string, value []byte) error
 	Get(key string) ([]byte, bool)
-	GetAll() map[string][]byte
 }
 
 var storage Repository
@@ -35,75 +31,52 @@ func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 	name := chi.URLParam(req, "name")
 	val := chi.URLParam(req, "val")
 
-	switch kind {
-	case gauge:
-		isReal := regexp.MustCompile(`^-?\d*\.?\d+$`).MatchString
-		if !isReal(val) {
-			logger.Warn("Invalid value for gauge", zap.String("val", val))
-			http.Error(rw, badRequestMessage, http.StatusBadRequest)
-			return
-		}
-		if err := storage.Save(name, []byte(val)); err != nil {
-			http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
-			return
-		}
-		rw.WriteHeader(http.StatusOK)
-	case counter:
-		isNatural := regexp.MustCompile(`^\d+$`).MatchString
-		if !isNatural(val) {
-			logger.Warn("Invalid value for counter")
-			http.Error(rw, badRequestMessage, http.StatusBadRequest)
-			return
-		}
-		if err := storage.Save(name, []byte(val), withAccInt64); err != nil {
-			http.Error(rw, badRequestMessage, http.StatusBadRequest)
-			return
-		}
-		rw.WriteHeader(http.StatusOK)
-	default:
-		logger.Warn("Invalid metric type")
+	bytes, err := toBytes(kind, val)
+	if err != nil {
+		logger.Warn("Invalid value or kind")
 		http.Error(rw, badRequestMessage, http.StatusBadRequest)
+		return
 	}
+
+	if err = storage.Update(name, bytes); err != nil {
+		logger.Warn("Internal server error")
+		http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
+	}
+	models.Accounter.Put(kind, name)
+
+	rw.WriteHeader(http.StatusOK)
 }
 
 func GetHandler(rw http.ResponseWriter, req *http.Request) {
 	logger.Debug("GET HANDLER starts ...")
-	name := chi.URLParam(req, "name")
-
-	switch chi.URLParam(req, "kind") {
-	case gauge:
-		data, ok := storage.Get(name)
-		if !ok {
-			logger.Warn("There is no such metric")
-			http.Error(rw, notFoundMessage, http.StatusNotFound)
-			return
-		}
-		if bytes, err := rw.Write(data); err != nil {
-			logger.Warn("failed to send data. size", zap.Int("size", bytes))
-		}
-		rw.WriteHeader(http.StatusOK)
-	case counter:
-		data, ok := storage.Get(name)
-		if !ok {
-			logger.Warn("There is no such metric")
-			http.Error(rw, notFoundMessage, http.StatusNotFound)
-			return
-		}
-		rw.WriteHeader(http.StatusOK)
-		_, _ = rw.Write(data)
-	default:
+	if kind := chi.URLParam(req, "kind"); !(kind == gauge || kind == counter) {
 		logger.Warn("Invalid metric type")
 		http.Error(rw, notFoundMessage, http.StatusNotFound)
 	}
+	name := chi.URLParam(req, "name")
+	data, ok := storage.Get(name)
+	if !ok {
+		logger.Warn("there is no such metric")
+		http.Error(rw, notFoundMessage, http.StatusNotFound)
+		return
+	}
+
+	numStr := bytesToString(name, data)
+
+	rw.WriteHeader(http.StatusOK)
+	_, _ = rw.Write([]byte(numStr))
 }
 
 func GetAllHandler(rw http.ResponseWriter, req *http.Request) {
 	logger.Debug("GET ALL HANDLER starts ...")
-	list := make([]Item, 0, metricsNumber)
+	list := make([]Item, 0, models.MetricsNumber)
 
-	logger.Info("Collect all metrics...")
-	for name, value := range storage.GetAll() {
-		list = append(list, Item{Name: name, Value: string(value)})
+	for _, key := range models.Accounter.List() {
+		bytes, ok := storage.Get(key)
+		if !ok {
+			continue
+		}
+		list = append(list, Item{Name: key, Value: bytesToString(key, bytes)})
 	}
 
 	logger.Info("Creating an html page...")

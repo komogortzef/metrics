@@ -1,30 +1,27 @@
 package server
 
-import "sync"
+import (
+	"sync"
 
-const metricsNumber = 29
+	"metrics/internal/logger"
+	"metrics/internal/models"
+)
 
 type MemStorage struct {
 	Items map[string][]byte
 	Mtx   *sync.RWMutex
 }
 
-func (ms *MemStorage) Save(key string, value []byte, opers ...Operation) error {
-	var err error
+func (ms *MemStorage) Update(key string, value []byte) error {
+	logger.Info("Save mem")
 	ms.Mtx.Lock()
 	defer ms.Mtx.Unlock()
-
-	if len(opers) > 0 {
-		for _, oper := range opers {
-			if oper != nil {
-				value, err = oper(ms.Items[key], value)
-			}
-		}
+	if models.IsCounter(key) {
+		value = accInt64(ms.Items[key], value)
 	}
-
 	ms.Items[key] = value
 
-	return err
+	return nil
 }
 
 func (ms *MemStorage) Get(key string) ([]byte, bool) {
@@ -33,16 +30,4 @@ func (ms *MemStorage) Get(key string) ([]byte, bool) {
 	ms.Mtx.RUnlock()
 
 	return val, ok
-}
-
-func (ms *MemStorage) GetAll() map[string][]byte {
-	res := make(map[string][]byte, metricsNumber)
-
-	ms.Mtx.RLock()
-	for name, val := range ms.Items {
-		res[name] = val
-	}
-	ms.Mtx.RUnlock()
-
-	return res
 }

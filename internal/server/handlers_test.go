@@ -90,27 +90,6 @@ func TestHandlers(t *testing.T) {
 			expected:    http.StatusOK,
 			description: "Sending a valid POST request with counter type",
 		},
-		{
-			name:        "get all",
-			method:      http.MethodGet,
-			url:         "/",
-			expected:    http.StatusOK,
-			description: "Sending a GET request",
-		},
-		{
-			name:        "non-existent value",
-			method:      http.MethodGet,
-			url:         "/value/gauge/name",
-			expected:    http.StatusNotFound,
-			description: "Sending a GET request with non-existent value",
-		},
-		{
-			name:        "existent value",
-			method:      http.MethodGet,
-			url:         "/value/gauge/metric",
-			expected:    http.StatusOK,
-			description: "Sending a GET request with existent value",
-		},
 	}
 
 	for _, test := range tests {

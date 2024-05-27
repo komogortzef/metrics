@@ -10,6 +10,11 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	gauge   = "gauge"
+	counter = "counter"
+)
+
 var (
 	address        string = "localhost:8080"
 	pollInterval   int    = 2
@@ -25,15 +30,16 @@ func SetCond(addr, format string, poll, report int) {
 	sendFormat = format
 }
 
-func send(kind string, name string, val any, client *resty.Client) {
+func send(kind, name string, val float64, client *resty.Client) {
 	if sendFormat == "json" {
 		var metric models.Metrics
 		metric.MType = kind
 		metric.ID = name
-		switch val := val.(type) {
-		case int64:
-			metric.Delta = &val
-		case float64:
+
+		if kind == counter {
+			intVal := int64(val)
+			metric.Delta = &intVal
+		} else {
 			metric.Value = &val
 		}
 		resp, err := client.R().
@@ -46,13 +52,7 @@ func send(kind string, name string, val any, client *resty.Client) {
 		}
 		logger.Debug("RESPONSE:", zap.String("resp", string(resp.Body())))
 	} else {
-		var URL string
-		if kind == gauge {
-			URL = fmt.Sprintf("update/%s/%s/%f",
-				kind, name, val)
-		} else {
-			URL = fmt.Sprintf("update/%s/%s/%d", kind, name, val)
-		}
+		URL := fmt.Sprintf("update/%s/%s/%v", kind, name, val)
 		if _, err := client.R().Post(URL); err != nil {
 			logger.Warn("No connection")
 			successSend = false

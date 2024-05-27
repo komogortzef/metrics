@@ -1,10 +1,10 @@
 package server
 
 import (
-	"fmt"
+	"encoding/binary"
 	"io"
+	"math"
 	"net/http"
-	"strconv"
 
 	"metrics/internal/logger"
 	"metrics/internal/models"
@@ -25,19 +25,26 @@ func UpdateJSON(rw http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
 	logger.Info("Saving in memory...")
-	switch metricData.MType {
-	case gauge:
-		val := fmt.Sprintf("%f", *metricData.Value)
-		_ = storage.Save(metricData.ID, []byte(val))
-	case counter:
-		val := strconv.FormatInt(*metricData.Delta, 10)
-		_ = storage.Save(metricData.ID, []byte(val), withAccInt64)
-		bytes, _ := storage.Get(metricData.ID)
-		intVal, _ := strconv.ParseInt(string(bytes), 10, 64)
-		metricData.Delta = &intVal
-	default:
+	bytes, err := toBytes(metricData.MType, metricData)
+	if err != nil {
 		http.Error(rw, badRequestMessage, http.StatusBadRequest)
+		return
 	}
+
+	if metricData.MType == counter {
+		err = storage.Update(metricData.ID, bytes)
+		bytes, _ := storage.Get(metricData.ID)
+		intVal := int64(binary.LittleEndian.Uint64(bytes))
+		metricData.Delta = &intVal
+	} else {
+		err = storage.Update(metricData.ID, bytes)
+	}
+	if err != nil {
+		logger.Warn("saving error")
+		http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
+		return
+	}
+	models.Accounter.Put(metricData.MType, metricData.ID)
 
 	logger.Info("Marshal JSON...")
 	jsonBytes, err := metricData.MarshalJSON()
@@ -70,10 +77,10 @@ func GetJSON(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	if metricData.MType == gauge {
-		num, _ := strconv.ParseFloat(string(val), 64)
+		num := math.Float64frombits(binary.LittleEndian.Uint64(val))
 		metricData.Value = &num
 	} else {
-		num, _ := strconv.ParseInt(string(val), 10, 64)
+		num := int64(binary.LittleEndian.Uint64(val))
 		metricData.Delta = &num
 	}
 

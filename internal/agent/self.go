@@ -11,12 +11,10 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
-const gauge = "gauge"
-
 type SelfMonitor struct {
 	runtime.MemStats
 	randVal   float64
-	pollCount int64
+	pollCount float64
 	Mtx       *sync.RWMutex
 }
 
@@ -42,7 +40,7 @@ func (m *SelfMonitor) Report() {
 		send(gauge, "Alloc", float64(m.Alloc), client)
 		send(gauge, "BuckHashSys", float64(m.BuckHashSys), client)
 		send(gauge, "Frees", float64(m.Frees), client)
-		send(gauge, "GCPUFraction", float64(m.GCCPUFraction), client)
+		send(gauge, "GCCPUFraction", m.GCCPUFraction, client)
 		send(gauge, "GCSys", float64(m.GCSys), client)
 		send(gauge, "HeapAlloc", float64(m.HeapAlloc), client)
 		send(gauge, "HeapIdle", float64(m.HeapIdle), client)
@@ -67,7 +65,7 @@ func (m *SelfMonitor) Report() {
 		send(gauge, "Sys", float64(m.Sys), client)
 		send(gauge, "TotalAlloc", float64(m.TotalAlloc), client)
 		send(gauge, "RandomValue", float64(m.randVal), client)
-		send("counter", "PollCount", m.pollCount, client)
+		send(counter, "PollCount", m.pollCount, client)
 		if successSend {
 			m.pollCount = 0
 			logger.Info("success sending")

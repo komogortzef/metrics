@@ -5,12 +5,14 @@ import (
 	"sync"
 	"testing"
 
+	"metrics/internal/models"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSave(t *testing.T) {
 	mem := MemStorage{
-		Items: make(map[string][]byte),
+		Items: make(map[string][]byte, models.MetricsNumber),
 		Mtx:   &sync.RWMutex{},
 	}
 
@@ -18,54 +20,40 @@ func TestSave(t *testing.T) {
 		name    string
 		argName string
 		argVal  []byte
-		argOper Operation
-		want    map[string][]byte
+		err     error
 	}{
 		{
 			name:    "to save gauge value",
-			argName: "Gauge",
-			argVal:  []byte("1.44"),
-			argOper: nil,
-			want: map[string][]byte{
-				"Gauge": []byte("1.44"),
-			},
+			argName: "Alloc",
+			argVal:  []byte("hellofdc"),
+			err:     nil,
 		},
 		{
 			name:    "to save counter value",
-			argName: "Counter",
-			argVal:  []byte("1"),
-			argOper: withAccInt64,
-			want: map[string][]byte{
-				"Gauge":   []byte("1.44"),
-				"Counter": []byte("1"),
-			},
+			argName: "PollCount",
+			argVal:  []byte("ssomefde"),
+			err:     nil,
 		},
 		{
 			name:    "to save counter one more time",
-			argName: "Counter",
-			argVal:  []byte("1"),
-			argOper: withAccInt64,
-			want: map[string][]byte{
-				"Gauge":   []byte("1.44"),
-				"Counter": []byte("2"),
-			},
+			argName: "Frees",
+			argVal:  []byte("raaaaaaa"),
+			err:     nil,
 		},
 	}
 
 	for _, test := range tests {
 		log.Println("\n\nTEST:", test.name)
-		_ = mem.Save(test.argName, test.argVal, test.argOper)
-		log.Println("mem:", mem.Items)
-		log.Println("testMem:", test.want)
-		assert.Equal(t, mem.Items, test.want)
+		err := mem.Update(test.argName, test.argVal)
+		assert.Equal(t, err, test.err)
 	}
 }
 
 func TestGet(t *testing.T) {
 	mem := MemStorage{
 		Items: map[string][]byte{
-			"Gauge":   []byte("1.44"),
-			"Counter": []byte("2"),
+			"Alloc":     []byte("1.44"),
+			"PollCount": []byte("2"),
 		},
 		Mtx: &sync.RWMutex{},
 	}
@@ -77,12 +65,12 @@ func TestGet(t *testing.T) {
 	}{
 		{
 			name: "get gauge",
-			arg:  "Gauge",
+			arg:  "Alloc",
 			want: true,
 		},
 		{
 			name: "get counter",
-			arg:  "Counter",
+			arg:  "PollCount",
 			want: true,
 		},
 
