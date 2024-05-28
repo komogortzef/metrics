@@ -13,6 +13,5 @@ func main() {
 		logger.Fatal("agent config error", zap.String("err", err.Error()))
 	}
 
-	go agent.Collect()
-	agent.Report()
+	agent.Run()
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"metrics/internal/compress"
 	"metrics/internal/logger"
 	"metrics/internal/server"
 
@@ -36,6 +37,7 @@ func NewServer(opts ...Option) (*http.Server, error) {
 
 func init() {
 	router.Use(logger.WithHandlerLog)
+	router.Use(compress.GzipMiddleware)
 	router.Get("/", server.GetAllHandler)
 	router.Post("/value/", server.GetJSON)
 	router.Get("/value/{kind}/{name}", server.GetHandler)

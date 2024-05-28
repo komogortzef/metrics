@@ -14,16 +14,19 @@ import (
 
 func UpdateJSON(rw http.ResponseWriter, req *http.Request) {
 	logger.Info("UpdateJSON starts...")
-
 	var metricData models.Metrics
-	json, _ := io.ReadAll(req.Body)
-	if err := metricData.UnmarshalJSON(json); err != nil {
+	bytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		logger.Warn("Couldn't read with decompress")
+	}
+	if err := metricData.UnmarshalJSON(bytes); err != nil {
+		logger.Warn("Unmarshall JSON error")
 		http.Error(rw, badRequestMessage, http.StatusBadRequest)
 		return
 	}
 	defer req.Body.Close()
 
-	bytes, err := toBytes(metricData.MType, metricData)
+	bytes, err = toBytes(metricData.MType, metricData)
 	if err != nil {
 		http.Error(rw, badRequestMessage, http.StatusBadRequest)
 		return
@@ -58,11 +61,17 @@ func GetJSON(rw http.ResponseWriter, req *http.Request) {
 	logger.Info("GetJSON starts...")
 	var metricData models.Metrics
 
-	jsonBytes, _ := io.ReadAll(req.Body)
-	if err := metricData.UnmarshalJSON(jsonBytes); err != nil {
+	var bytes []byte
+	bytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		logger.Warn("Couldn't read with decompress")
+	}
+	if err := metricData.UnmarshalJSON(bytes); err != nil {
+		logger.Warn("Unmarshall JSON error")
 		http.Error(rw, badRequestMessage, http.StatusBadRequest)
 		return
 	}
+	defer req.Body.Close()
 
 	val, ok := storage.Get(metricData.ID)
 	if !ok {

@@ -11,6 +11,7 @@ import (
 type Telemetry interface {
 	Collect()
 	Report()
+	Run()
 }
 
 func NewAgent(opts ...Option) (Telemetry, error) {
@@ -24,7 +25,7 @@ func NewAgent(opts ...Option) (Telemetry, error) {
 		err = option(&options)
 	}
 
-	agent.SetCond(options.Address, "", options.PollInterval, options.ReportInterval)
+	agent.SetCond(options.Address, "json", options.PollInterval, options.ReportInterval)
 
 	return &agent.SelfMonitor{Mtx: &sync.RWMutex{}}, err
 }

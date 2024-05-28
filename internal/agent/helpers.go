@@ -1,12 +1,14 @@
 package agent
 
 import (
+	"bytes"
 	"fmt"
+	"net/http"
 
+	"metrics/internal/compress"
 	"metrics/internal/logger"
 	"metrics/internal/models"
 
-	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
 )
 
@@ -30,8 +32,10 @@ func SetCond(addr, format string, poll, report int) {
 	sendFormat = format
 }
 
-func send(kind, name string, val float64, client *resty.Client) {
-	if sendFormat == "json" {
+func send(kind, name string, val float64) {
+	baseurl := "http://" + address + "/update/"
+	switch sendFormat {
+	case "json":
 		var metric models.Metrics
 		metric.MType = kind
 		metric.ID = name
@@ -42,19 +46,37 @@ func send(kind, name string, val float64, client *resty.Client) {
 		} else {
 			metric.Value = &val
 		}
-		resp, err := client.R().
-			SetHeader("Content-Type", "application/json").
-			SetBody(metric).
-			Post("update/")
+
+		jsonBytes, err := metric.MarshalJSON()
 		if err != nil {
-			logger.Warn("No connection")
+			logger.Error("Coulnd't Marshall JSON")
+		}
+
+		compJson, err := compress.Compress(jsonBytes)
+		if err != nil {
+			logger.Error("compress error!!")
+		}
+
+		req, err := http.NewRequest(http.MethodPost, baseurl, bytes.NewReader(compJson))
+		if err != nil {
+			logger.Warn("Create request error")
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
+		_, err = http.DefaultClient.Do(req)
+		if err != nil {
+			logger.Warn("No connection", zap.String("err", err.Error()))
 			successSend = false
 		}
-		logger.Debug("RESPONSE:", zap.String("resp", string(resp.Body())))
-	} else {
-		URL := fmt.Sprintf("update/%s/%s/%v", kind, name, val)
-		if _, err := client.R().Post(URL); err != nil {
-			logger.Warn("No connection")
+	default:
+		url := fmt.Sprintf("%s/%s/%s/%v", baseurl, kind, name, val)
+		req, err := http.NewRequest(http.MethodPost, url, nil)
+		if err != nil {
+			logger.Warn("Couldn't create a req")
+		}
+		_, err = http.DefaultClient.Do(req)
+		if err != nil {
+			logger.Warn("No connection", zap.String("err", err.Error()))
 			successSend = false
 		}
 	}

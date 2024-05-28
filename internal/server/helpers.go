@@ -8,14 +8,12 @@ import (
 	"strconv"
 	"sync"
 
-	"metrics/internal/logger"
 	"metrics/internal/models"
 )
 
 const bitSize = 8
 
 func SetStorage(st string) {
-	logger.Info("Set storage...")
 	switch st {
 	default:
 		storage = &MemStorage{
