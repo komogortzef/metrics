@@ -52,32 +52,43 @@ func send(kind, name string, val float64) {
 			logger.Error("Coulnd't Marshall JSON")
 		}
 
-		compJson, err := compress.Compress(jsonBytes)
+		compJSON, err := compress.Compress(jsonBytes)
 		if err != nil {
 			logger.Error("compress error!!")
 		}
 
-		req, err := http.NewRequest(http.MethodPost, baseurl, bytes.NewReader(compJson))
+		req, err := http.NewRequest(http.MethodPost, baseurl, bytes.NewReader(compJSON))
 		if err != nil {
 			logger.Warn("Create request error")
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
-		_, err = http.DefaultClient.Do(req)
+		r, err := http.DefaultClient.Do(req)
 		if err != nil {
 			logger.Warn("No connection", zap.String("err", err.Error()))
 			successSend = false
 		}
+		defer func() {
+			if r != nil && r.Body != nil {
+				r.Body.Close()
+			}
+		}()
 	default:
-		url := fmt.Sprintf("%s/%s/%s/%v", baseurl, kind, name, val)
+		url := fmt.Sprintf("%s%s/%s/%v", baseurl, kind, name, val)
 		req, err := http.NewRequest(http.MethodPost, url, nil)
 		if err != nil {
 			logger.Warn("Couldn't create a req")
 		}
-		_, err = http.DefaultClient.Do(req)
+		logger.Info(url)
+		r, err := http.DefaultClient.Do(req)
 		if err != nil {
 			logger.Warn("No connection", zap.String("err", err.Error()))
 			successSend = false
 		}
+		defer func() {
+			if r != nil && r.Body != nil {
+				r.Body.Close()
+			}
+		}()
 	}
 }

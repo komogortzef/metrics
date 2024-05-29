@@ -37,10 +37,9 @@ func NewServer(opts ...Option) (*http.Server, error) {
 
 func init() {
 	router.Use(logger.WithHandlerLog)
-	router.Use(compress.GzipMiddleware)
-	router.Get("/", server.GetAllHandler)
-	router.Post("/value/", server.GetJSON)
+	router.Get("/", compress.GzipMiddleware(server.GetAllHandler))
+	router.Post("/value/", compress.GzipMiddleware(server.GetJSON))
 	router.Get("/value/{kind}/{name}", server.GetHandler)
-	router.Post("/update/", server.UpdateJSON)
+	router.Post("/update/", compress.GzipMiddleware(server.UpdateJSON))
 	router.Post("/update/{kind}/{name}/{val}", server.UpdateHandler)
 }

@@ -5,39 +5,37 @@ import (
 	"sync"
 	"testing"
 
-	"metrics/internal/models"
-
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSave(t *testing.T) {
 	mem := MemStorage{
-		Items: make(map[string][]byte, models.MetricsNumber),
+		Items: make(map[string]string, metricsNumber),
 		Mtx:   &sync.RWMutex{},
 	}
 
 	tests := []struct {
 		name    string
 		argName string
-		argVal  []byte
+		argVal  string
 		err     error
 	}{
 		{
 			name:    "to save gauge value",
 			argName: "Alloc",
-			argVal:  []byte("hellofdc"),
+			argVal:  "hellofdc",
 			err:     nil,
 		},
 		{
 			name:    "to save counter value",
 			argName: "PollCount",
-			argVal:  []byte("ssomefde"),
+			argVal:  "ssomefde",
 			err:     nil,
 		},
 		{
 			name:    "to save counter one more time",
 			argName: "Frees",
-			argVal:  []byte("raaaaaaa"),
+			argVal:  "raaaaaaa",
 			err:     nil,
 		},
 	}
@@ -51,9 +49,9 @@ func TestSave(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	mem := MemStorage{
-		Items: map[string][]byte{
-			"Alloc":     []byte("1.44"),
-			"PollCount": []byte("2"),
+		Items: map[string]string{
+			"Alloc":     "1.44",
+			"PollCount": "2",
 		},
 		Mtx: &sync.RWMutex{},
 	}
