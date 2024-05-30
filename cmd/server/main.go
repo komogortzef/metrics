@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	server, err := config.NewServer(config.WithEnv, config.WithCmd)
+	server, err := config.NewServer(config.WithEnvSrv, config.WithCmdSrv)
 	if err != nil {
 		logger.Fatal("Config error", zap.String("error", err.Error()))
 	}

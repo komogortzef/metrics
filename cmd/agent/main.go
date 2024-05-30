@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	agent, err := config.NewAgent(config.WithEnv, config.WithCmd)
+	agent, err := config.NewAgent(config.WithEnvAg, config.WithCmdAg)
 	if err != nil {
 		logger.Fatal("agent config error", zap.String("err", err.Error()))
 	}

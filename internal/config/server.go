@@ -9,20 +9,20 @@ import (
 	"metrics/internal/server"
 
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
 var router = chi.NewRouter()
 
 func NewServer(opts ...Option) (*http.Server, error) {
-	var err error
-	err = logger.InitLog()
+	err := logger.InitLog()
 	if err != nil {
 		return nil, fmt.Errorf("init logger error: %w", err)
 	}
 
 	var options options
 	for _, opt := range opts {
-		err = opt(&options)
+		opt(&options)
 	}
 
 	server.SetStorage("mem")
@@ -31,6 +31,13 @@ func NewServer(opts ...Option) (*http.Server, error) {
 		Addr:    options.Address,
 		Handler: router,
 	}
+
+	logger.Info("Serv config:",
+		zap.String("addr", options.Address),
+		zap.Int("store interval", options.storeInterval),
+		zap.String("file stor path", options.fileStorage),
+		zap.Bool("restore", options.restore),
+	)
 
 	return srv, err
 }

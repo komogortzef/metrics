@@ -6,6 +6,8 @@ import (
 
 	"metrics/internal/agent"
 	"metrics/internal/logger"
+
+	"go.uber.org/zap"
 )
 
 type Telemetry interface {
@@ -22,10 +24,16 @@ func NewAgent(opts ...Option) (Telemetry, error) {
 	var err error
 	var options options
 	for _, option := range opts {
-		err = option(&options)
+		option(&options)
 	}
 
 	agent.SetCond(options.Address, "json", options.PollInterval, options.ReportInterval)
+
+	logger.Info("Agent config",
+		zap.String("addr", options.Address),
+		zap.Int("poll count", options.PollInterval),
+		zap.Int("report interval", options.ReportInterval),
+	)
 
 	return &agent.SelfMonitor{Mtx: &sync.RWMutex{}}, err
 }
