@@ -21,19 +21,17 @@ func NewAgent(opts ...Option) (Telemetry, error) {
 		return nil, fmt.Errorf("init logger error: %w", err)
 	}
 
-	var err error
 	var options options
 	for _, option := range opts {
 		option(&options)
 	}
 
 	agent.SetCond(options.Address, "json", options.PollInterval, options.ReportInterval)
-
 	logger.Info("Agent config",
 		zap.String("addr", options.Address),
 		zap.Int("poll count", options.PollInterval),
 		zap.Int("report interval", options.ReportInterval),
 	)
 
-	return &agent.SelfMonitor{Mtx: &sync.RWMutex{}}, err
+	return &agent.SelfMonitor{Mtx: &sync.RWMutex{}}, nil
 }

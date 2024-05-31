@@ -52,7 +52,7 @@ func GetHandler(rw http.ResponseWriter, req *http.Request) {
 
 func GetAllHandler(rw http.ResponseWriter, req *http.Request) {
 	logger.Debug("GET ALL HANDLER starts ...")
-	list := make([]Item, 0, models.MetricsNumber)
+	list := make([]Item, 0, metricsNumber)
 
 	for _, key := range accounter.list() {
 		val, ok := storage.Get(key)

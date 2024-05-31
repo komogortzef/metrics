@@ -31,7 +31,6 @@ func Fatal(msg string, fields ...zapcore.Field) {
 var logger *zap.Logger = zap.NewNop()
 
 func InitLog() error {
-	// Создаем zap.AtomicLevel и устанавливаем уровень логгирования на Debug
 	atomicLevel := zap.NewAtomicLevel()
 	atomicLevel.SetLevel(zapcore.DebugLevel)
 

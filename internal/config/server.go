@@ -24,8 +24,9 @@ func NewServer(opts ...Option) (*http.Server, error) {
 	for _, opt := range opts {
 		opt(&options)
 	}
-
-	server.SetStorage("mem")
+	if options.fileStorage != "" {
+		server.SetStorage("mem")
+	}
 
 	srv := &http.Server{
 		Addr:    options.Address,
