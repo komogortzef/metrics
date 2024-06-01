@@ -6,8 +6,10 @@ import (
 	m "metrics/internal/models"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/tidwall/gjson"
+	"go.uber.org/zap"
 )
 
 const metricsNumber = 29
@@ -26,19 +28,19 @@ type (
 
 	FileStorage struct {
 		Repository
-		File *os.File
+		file *os.File
 	}
 )
 
 func (ms *MemStorage) Write(input []byte) (int, error) {
 	logger.Info("Mem Write...")
-	typeBytes := gjson.GetBytes(input, m.Mtype)
-	fmt.Println("type:", typeBytes.String())
-	nameBytes := gjson.GetBytes(input, m.Id)
-	name := nameBytes.String()
+	var newMet m.Metrics
+	newMet.UnmarshalJSON(input)
+	fmt.Println("passed:", newMet.String())
 
+	mtype, name := getInfo(input)
 	ms.Mtx.Lock()
-	if typeBytes.String() == m.Counter {
+	if mtype == m.Counter {
 		logger.Info("is counter...")
 		if old, ok := ms.items[name]; ok {
 			logger.Info("counter exists")
@@ -52,20 +54,38 @@ func (ms *MemStorage) Write(input []byte) (int, error) {
 	lenItems := len(ms.items)
 	ms.Mtx.Unlock()
 
-	fmt.Println("len storage:", lenItems)
+	logger.Info("storage length", zap.Int("len", lenItems))
 	return lenItems, nil
 }
 
-func (ms *MemStorage) Read(output []byte) (int, error) {
+func (ms *MemStorage) Read(output *[]byte) (int, error) {
+	logger.Info("Mem Read ...")
+
+	name := gjson.GetBytes(*output, m.Id)
+
+	var err error
+	ms.Mtx.RLock()
+	data, ok := ms.items[name.String()]
+	ms.Mtx.RUnlock()
+	if !ok {
+		logger.Warn("NO VALUE!!")
+		err = m.ErrNoVal
+	}
+
+	*output = make([]byte, len(data))
+	copy(*output, data)
+
+	return len(*output), err
+}
+
+func (fs *FileStorage) Write(output []byte) (int, error) {
+
+	time.AfterFunc(time.Duration(storeInterval)*time.Second, func() {
+		list := getList(fs.Repository)
+		for _, bytes := range list {
+			fs.file.Write(bytes)
+		}
+	})
 
 	return 0, nil
-}
-
-func (ms *MemStorage) Put(name string, input []byte) error {
-	return nil
-}
-
-func (ms *MemStorage) Get(name string) ([]byte, error) {
-
-	return []byte("ok"), nil
 }

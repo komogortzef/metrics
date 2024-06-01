@@ -30,7 +30,8 @@ const (
 )
 
 var (
-	ErrNoValOrType = errors.New("metric without val")
+	ErrNoVal       = errors.New("metric without val")
+	ErrInvalidType = errors.New("invalid type")
 )
 
 func NewMetric(id, mtype string, val any) (Metrics, error) {
@@ -38,7 +39,7 @@ func NewMetric(id, mtype string, val any) (Metrics, error) {
 
 	var metric Metrics
 	if mtype != Counter && mtype != Gauge {
-		return metric, ErrNoValOrType
+		return metric, ErrInvalidType
 	}
 	metric.MType = mtype
 	metric.ID = id
@@ -54,22 +55,26 @@ func NewMetric(id, mtype string, val any) (Metrics, error) {
 			logger.Info("int64string...")
 			num, err := strconv.ParseInt(v, 10, 64)
 			if err != nil {
-				return metric, ErrNoValOrType
+				return metric, ErrNoVal
 			}
 			metric.Delta = &num
 		} else {
 			logger.Info("float64string...")
 			num, err := strconv.ParseFloat(v, 64)
 			if err != nil {
-				return metric, ErrNoValOrType
+				return metric, ErrNoVal
 			}
 			metric.Value = &num
 		}
 	}
+
 	return metric, nil
 }
 
-func (met *Metrics) String() string {
+func (met Metrics) String() string {
+	if met.Delta == nil && met.Value == nil {
+		return fmt.Sprintf("%s, %s: <empty>", met.MType, met.ID)
+	}
 	if met.MType == Counter {
 		return fmt.Sprintf("%s, %s: %d", met.MType, met.ID, *met.Delta)
 	}

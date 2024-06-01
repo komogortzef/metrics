@@ -55,16 +55,17 @@ func addCounter(old []byte, input []byte) (new []byte) {
 	return
 }
 
-func getList(storage Repository) []m.Metrics {
-	metrics := make([]m.Metrics, 0, metricsNumber)
+func getList(storage Repository) [][]byte {
+	logger.Info("get list ...")
+	metrics := make([][]byte, 0, metricsNumber)
 
 	switch s := storage.(type) {
 	case *MemStorage:
-		var metric m.Metrics
+		s.Mtx.RLock()
 		for _, met := range s.items {
-			_ = metric.UnmarshalJSON(met)
-			metrics = append(metrics, metric)
+			metrics = append(metrics, met)
 		}
+		s.Mtx.RUnlock()
 	}
 
 	return metrics
@@ -88,4 +89,12 @@ func SetStorage(ots string) {
 	default:
 		storage = newMemStorage()
 	}
+}
+
+func getInfo(input []byte) (string, string) {
+	typeBytes := gjson.GetBytes(input, m.Mtype)
+	mtype := typeBytes.String()
+	nameBytes := gjson.GetBytes(input, m.Id)
+	name := nameBytes.String()
+	return mtype, name
 }

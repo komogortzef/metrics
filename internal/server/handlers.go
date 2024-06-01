@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,21 +16,21 @@ import (
 )
 
 type Repository interface {
-	io.Reader
 	io.Writer
-	Put(metName string, data []byte) error
-	Get(metname string) ([]byte, error)
+	Read(*[]byte) (int, error)
 }
 
 var storage Repository
 
 func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 	logger.Debug("UPDATE HANDLER starts ...")
+
 	kind := chi.URLParam(req, m.Mtype)
 	name := chi.URLParam(req, m.Id)
 	val := chi.URLParam(req, m.Value)
 
 	metric, err := m.NewMetric(name, kind, val)
+	fmt.Println("pass metric:", metric.String())
 	if err != nil {
 		logger.Warn("Invalid metric value or type")
 		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
@@ -50,16 +51,23 @@ func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 
 func GetHandler(rw http.ResponseWriter, req *http.Request) {
 	logger.Debug("GET HANDLER starts ...")
+
 	kind := chi.URLParam(req, m.Mtype)
 	name := chi.URLParam(req, m.Id)
 
-	if kind != m.Gauge && kind != m.Counter {
+	metric, err := m.NewMetric(name, kind, 1000)
+	if errors.Is(m.ErrInvalidType, err) {
 		logger.Warn("Invalid metric type")
 		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
 		return
 	}
 
-	bytes, err := storage.Get(name)
+	bytes, err := metric.MarshalJSON()
+	if err != nil {
+		logger.Warn("Marshal problem", zap.Error(err))
+	}
+
+	_, err = storage.Read(&bytes)
 	if err != nil {
 		logger.Warn("Coundn't fetch the metric from storage")
 		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
@@ -68,9 +76,11 @@ func GetHandler(rw http.ResponseWriter, req *http.Request) {
 
 	var numStr string
 	if kind == m.Counter {
+		logger.Info("is counter...")
 		numBytes := gjson.GetBytes(bytes, m.Delta)
 		numStr = strconv.FormatInt(numBytes.Int(), 10)
 	} else {
+		logger.Info("is gauge...")
 		numBytes := gjson.GetBytes(bytes, m.Value)
 		numStr = strconv.FormatFloat(numBytes.Float(), 'f', -1, 64)
 	}
@@ -81,10 +91,11 @@ func GetHandler(rw http.ResponseWriter, req *http.Request) {
 
 func GetAllHandler(rw http.ResponseWriter, req *http.Request) {
 	logger.Debug("GET ALL HANDLER starts ...")
+	var metric m.Metrics
 	list := make([]Item, 0, metricsNumber)
 
-	for _, metric := range getList(storage) {
-		fmt.Println(metric.String())
+	for _, bytes := range getList(storage) {
+		metric.UnmarshalJSON(bytes)
 		list = append(list, Item{Met: metric.String()})
 	}
 
@@ -109,13 +120,17 @@ func UpdateJSON(rw http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
 	typeBytes := gjson.GetBytes(bytes, m.Mtype)
-	nameBytes := gjson.GetBytes(bytes, m.Id)
-	if err = storage.Put(nameBytes.String(), bytes); err != nil {
+	mtype := typeBytes.String()
+	if mtype != m.Counter && mtype != m.Gauge {
+		logger.Info("Invalid metric type")
+		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
+		return
+	}
+	if _, err = storage.Write(bytes); err != nil {
 		logger.Warn("Coudn't save data to storage")
 	}
-	if typeBytes.String() == m.Counter {
-		bytes = bytes[:0]
-		bytes, err = storage.Get(nameBytes.String())
+	if mtype == m.Counter {
+		_, err = storage.Read(&bytes)
 		if err != nil {
 			logger.Warn("Coulnd't fetch the metric from storage")
 		}
@@ -133,8 +148,15 @@ func GetJSON(rw http.ResponseWriter, req *http.Request) {
 	}
 	defer req.Body.Close()
 
-	nameBytes := gjson.GetBytes(bytes, m.Id)
-	jsonBytes, err := storage.Get(nameBytes.String())
+	typeBytes := gjson.GetBytes(bytes, m.Mtype)
+	mtype := typeBytes.String()
+	if mtype != m.Counter && mtype != m.Gauge {
+		logger.Info("Invalid metric type")
+		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
+		return
+	}
+
+	_, err = storage.Read(&bytes)
 	if err != nil {
 		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
 		return
@@ -142,5 +164,5 @@ func GetJSON(rw http.ResponseWriter, req *http.Request) {
 
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusOK)
-	_, _ = rw.Write(jsonBytes)
+	_, _ = rw.Write(bytes)
 }
