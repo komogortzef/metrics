@@ -24,9 +24,7 @@ func NewServer(opts ...Option) (*http.Server, error) {
 	for _, opt := range opts {
 		opt(&options)
 	}
-	if options.fileStorage != "" {
-		server.SetStorage("mem")
-	}
+	server.SetStorage("mem")
 
 	srv := &http.Server{
 		Addr:    options.Address,
@@ -47,7 +45,7 @@ func init() {
 	router.Use(logger.WithHandlerLog)
 	router.Get("/", compress.GzipMiddleware(server.GetAllHandler))
 	router.Post("/value/", compress.GzipMiddleware(server.GetJSON))
-	router.Get("/value/{kind}/{name}", server.GetHandler)
+	router.Get("/value/{type}/{id}", server.GetHandler)
 	router.Post("/update/", compress.GzipMiddleware(server.UpdateJSON))
-	router.Post("/update/{kind}/{name}/{val}", server.UpdateHandler)
+	router.Post("/update/{type}/{id}/{value}", server.UpdateHandler)
 }

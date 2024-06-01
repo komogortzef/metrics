@@ -16,14 +16,13 @@ const getAllHTML = `<!DOCTYPE html>
   <body>
   	<h1>All metrics</h1>
 	<ul>{{ range .Data}}
-	<li>{{ .Name }} {{ .Value }}</li>{{ end }}
+	<li>{{ .Name }}</li>{{ end }}
 	</ul>
   </body>
 </html>`
 
 type Item struct {
-	Name  string
-	Value string
+	Met string
 }
 
 type templateArgs struct {

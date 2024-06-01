@@ -2,7 +2,6 @@ package config
 
 import (
 	"flag"
-	"fmt"
 	"metrics/internal/logger"
 	"os"
 	"regexp"
@@ -39,8 +38,7 @@ type options struct {
 	storeInterval  int
 	fileStorage    string
 	restore        bool
-
-	state uint8
+	state          uint8
 }
 
 type Option func(*options)
@@ -76,7 +74,6 @@ var WithEnvAg = func(o *options) {
 }
 
 var WithEnvSrv = func(o *options) {
-	fmt.Printf("With env begin: %b\n", o.state)
 	o.setAddr()
 
 	if val, ok := os.LookupEnv("STORE_INTERVAL"); ok {
@@ -107,8 +104,6 @@ var WithEnvSrv = func(o *options) {
 			o.state |= restoreArg
 		}
 	}
-
-	fmt.Printf("With env ends: %b\n", o.state)
 }
 
 var WithCmdAg = func(o *options) {
@@ -132,8 +127,6 @@ var WithCmdAg = func(o *options) {
 }
 
 var WithCmdSrv = func(o *options) {
-	fmt.Printf("from cmd begin: %b\n", o.state)
-
 	addrFlag := flag.String("a", defaultAddr, "Input the endpoint Address: <host:port>")
 	storInterFlag := flag.Int("i", defStorInterv, "Input the store interval: <sec>")
 	filePathFlag := flag.String("f", defStorPath, "Input file storage path: </path/to/file")
