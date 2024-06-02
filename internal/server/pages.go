@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"html/template"
-	"log"
+
+	l "metrics/internal/logger"
 )
 
 const getAllHTML = `<!DOCTYPE html>
@@ -34,7 +35,7 @@ func renderGetAll(data []Item) (*bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
 	err := indexTemplate.Execute(buf, templateArgs{Data: data})
 	if err != nil {
-		log.Println(err)
+		l.Warn("error html template exec")
 		return nil, errors.Unwrap(err)
 	}
 

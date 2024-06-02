@@ -2,7 +2,7 @@ package main
 
 import (
 	"metrics/internal/config"
-	"metrics/internal/logger"
+	l "metrics/internal/logger"
 
 	"go.uber.org/zap"
 )
@@ -10,7 +10,7 @@ import (
 func main() {
 	agent, err := config.NewAgent(config.WithEnvAg, config.WithCmdAg)
 	if err != nil {
-		logger.Fatal("agent config error", zap.String("err", err.Error()))
+		l.Fatal("agent config error", zap.String("err", err.Error()))
 	}
 
 	agent.Run()

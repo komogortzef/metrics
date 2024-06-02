@@ -2,7 +2,7 @@ package main
 
 import (
 	"metrics/internal/config"
-	"metrics/internal/logger"
+	l "metrics/internal/logger"
 
 	"go.uber.org/zap"
 )
@@ -10,10 +10,10 @@ import (
 func main() {
 	server, err := config.NewServer(config.WithEnvSrv, config.WithCmdSrv)
 	if err != nil {
-		logger.Fatal("Config error", zap.String("error", err.Error()))
+		l.Fatal("Config error", zap.String("error", err.Error()))
 	}
 
 	if err = server.ListenAndServe(); err != nil {
-		logger.Fatal("Couldn't start the sever:", zap.String("err", err.Error()))
+		l.Fatal("Couldn't start the sever:", zap.String("err", err.Error()))
 	}
 }

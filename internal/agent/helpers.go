@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"runtime"
 
-	"metrics/internal/compress"
-	"metrics/internal/logger"
+	c "metrics/internal/compress"
+	l "metrics/internal/logger"
 	m "metrics/internal/models"
 
 	"go.uber.org/zap"
@@ -68,15 +68,15 @@ func send(metric m.Metrics) error {
 	case "json":
 		jsonBytes, err := metric.MarshalJSON()
 		if err != nil {
-			return fmt.Errorf("Coulnd't Marshall JSON: %w", err)
+			return fmt.Errorf("coulnd't Marshall JSON: %w", err)
 		}
-		compJSON, err := compress.Compress(jsonBytes)
+		compJSON, err := c.Compress(jsonBytes)
 		if err != nil {
-			return fmt.Errorf("Couldn't compress: %w", err)
+			return fmt.Errorf("couldn't compress: %w", err)
 		}
 		req, err := http.NewRequest(http.MethodPost, baseurl, bytes.NewReader(compJSON))
 		if err != nil {
-			logger.Warn("Create request error", zap.Error(err))
+			l.Warn("Create request error", zap.Error(err))
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
@@ -86,7 +86,7 @@ func send(metric m.Metrics) error {
 		url := fmt.Sprintf("%s%s/%s/%v", baseurl, metric.MType, metric.ID, metric.Data())
 		req, err := http.NewRequest(http.MethodPost, url, nil)
 		if err != nil {
-			logger.Warn("Couldn't create a req", zap.Error(err))
+			l.Warn("Couldn't create a req", zap.Error(err))
 		}
 		return sendMetric(req)
 	}
@@ -95,7 +95,7 @@ func send(metric m.Metrics) error {
 func sendMetric(req *http.Request) error {
 	r, err := http.DefaultClient.Do(req)
 	if err != nil {
-		logger.Warn("No connection", zap.String("err", err.Error()))
+		l.Warn("No connection", zap.String("err", err.Error()))
 	}
 	if r != nil && r.Body != nil {
 		r.Body.Close()

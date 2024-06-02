@@ -3,7 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
-	"metrics/internal/logger"
+	"math"
 	"strconv"
 )
 
@@ -33,7 +33,7 @@ const (
 	Gauge   = "gauge"
 	Counter = "counter"
 	Mtype   = "type"
-	Id      = "id"
+	ID      = "id"
 	Value   = "value"
 	Delta   = "delta"
 )
@@ -43,18 +43,27 @@ var (
 	ErrInvalidType = errors.New("invalid type")
 )
 
-func NewMetric(mtype, id string, val any) (Metrics, error) {
+func NewMetric(id, mtype string, val any) (Metrics, error) {
 	var metric Metrics
 	if mtype != Counter && mtype != Gauge {
 		return metric, ErrInvalidType
 	}
+	metric.MType = mtype
+	metric.ID = id
 	switch v := val.(type) {
+	case nil:
+		if mtype == Counter {
+			delta := int64(math.MaxInt64)
+			metric.Delta = &delta
+		} else {
+			value := float64(math.MaxFloat64)
+			metric.Value = &value
+		}
 	case int64:
 		metric.Delta = &v
 	case float64:
 		metric.Value = &v
 	case string:
-		logger.Info("string...")
 		if mtype == Counter {
 			num, err := strconv.ParseInt(v, 10, 64)
 			if err != nil {
@@ -70,8 +79,6 @@ func NewMetric(mtype, id string, val any) (Metrics, error) {
 		}
 	}
 
-	metric.MType = mtype
-	metric.ID = id
 	return metric, nil
 }
 

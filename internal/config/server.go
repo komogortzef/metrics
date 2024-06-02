@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"metrics/internal/compress"
-	"metrics/internal/logger"
+	c "metrics/internal/compress"
+	l "metrics/internal/logger"
 	"metrics/internal/server"
 
 	"github.com/go-chi/chi/v5"
@@ -15,23 +15,20 @@ import (
 var router = chi.NewRouter()
 
 func NewServer(opts ...func(*options)) (*http.Server, error) {
-	err := logger.InitLog()
+	err := l.InitLog()
 	if err != nil {
-		return nil, fmt.Errorf("init logger error: %w", err)
+		return nil, fmt.Errorf("init l error: %w", err)
 	}
-
 	var options options
 	for _, opt := range opts {
 		opt(&options)
 	}
-
 	server.SetStorage("mem")
 	srv := &http.Server{
 		Addr:    options.Address,
 		Handler: router,
 	}
-
-	logger.Info("Serv config:",
+	l.Info("Serv config:",
 		zap.String("addr", options.Address),
 		zap.Int("store interval", options.storeInterval),
 		zap.String("file stor path", options.fileStorage),
@@ -42,10 +39,10 @@ func NewServer(opts ...func(*options)) (*http.Server, error) {
 }
 
 func init() {
-	router.Use(logger.WithHandlerLog)
-	router.Get("/", compress.GzipMiddleware(server.GetAllHandler))
-	router.Post("/value/", compress.GzipMiddleware(server.GetJSON))
+	router.Use(l.WithHandlerLog)
+	router.Get("/", c.GzipMiddleware(server.GetAllHandler))
+	router.Post("/value/", c.GzipMiddleware(server.GetJSON))
 	router.Get("/value/{type}/{id}", server.GetHandler)
-	router.Post("/update/", compress.GzipMiddleware(server.UpdateJSON))
+	router.Post("/update/", c.GzipMiddleware(server.UpdateJSON))
 	router.Post("/update/{type}/{id}/{value}", server.UpdateHandler)
 }

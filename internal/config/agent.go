@@ -5,13 +5,13 @@ import (
 	"sync"
 
 	"metrics/internal/agent"
-	"metrics/internal/logger"
+	l "metrics/internal/logger"
 
 	"go.uber.org/zap"
 )
 
 func NewAgent(opts ...func(*options)) (*agent.SelfMonitor, error) {
-	if err := logger.InitLog(); err != nil {
+	if err := l.InitLog(); err != nil {
 		return nil, fmt.Errorf("init logger error: %w", err)
 	}
 
@@ -23,7 +23,7 @@ func NewAgent(opts ...func(*options)) (*agent.SelfMonitor, error) {
 	agent.SetCond(
 		options.Address, "json", options.PollInterval, options.ReportInterval)
 
-	logger.Info("Agent config",
+	l.Info("Agent config",
 		zap.String("addr", options.Address),
 		zap.Int("poll count", options.PollInterval),
 		zap.Int("report interval", options.ReportInterval))

@@ -33,8 +33,8 @@ func testRequest(
 func TestHandlers(t *testing.T) {
 	r := chi.NewRouter()
 	r.Get("/", GetAllHandler)
-	r.Get("/value/{kind}/{name}", GetHandler)
-	r.Post("/update/{kind}/{name}/{val}", UpdateHandler)
+	r.Get("/value/{type}/{id}", GetHandler)
+	r.Post("/update/{type}/{id}/{value}", UpdateHandler)
 
 	SetStorage("mem")
 

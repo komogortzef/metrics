@@ -1,9 +1,10 @@
 package server
 
 import (
-	"metrics/internal/logger"
-	m "metrics/internal/models"
 	"sync"
+
+	l "metrics/internal/logger"
+	m "metrics/internal/models"
 
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
@@ -16,83 +17,53 @@ func newMemStorage() Repository {
 	}
 }
 
-// func newFileStorage(path string, resotre bool) (Repository, error) {
-// 	logger.Info("New file storage ...")
-// 	storage := FileStorage{
-// 		Repository: newMemStorage(),
-// 	}
-
-// 	var file *os.File
-// 	var err error
-// 	if restore {
-// 		file, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
-// 		logger.Info("restore from file")
-// 		restoreFromFile(file, storage.Repository)
-// 	} else {
-// 		file, err = os.OpenFile(path, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
-// 	}
-
-// 	storage.File = file
-
-// 	return &storage, err
-// }
-
-func addCounter(old []byte, input []byte) (new []byte) {
-	var newStruct m.Metrics
-	err := newStruct.UnmarshalJSON(old)
+func addCounter(old []byte, input []byte) []byte {
+	var oldStruct m.Metrics
+	err := oldStruct.UnmarshalJSON(old)
 	if err != nil {
-		logger.Warn("UNMARSHAL problems", zap.Error(err))
+		l.Warn("UNMARSHAL problems", zap.Error(err))
 	}
 	numBytes := gjson.GetBytes(input, m.Delta)
-	*newStruct.Delta += numBytes.Int()
-	if new, err = newStruct.MarshalJSON(); err != nil {
-		logger.Warn("marshal problems", zap.Error(err))
+	*oldStruct.Delta += numBytes.Int()
+	bytes, err := oldStruct.MarshalJSON()
+	if err != nil {
+		l.Warn("marshal problems", zap.Error(err))
 	}
 
-	return
+	return bytes
 }
 
 func getList(storage Repository) [][]byte {
-	i := 0
-	metrics := make([][]byte, m.MetricsNumber)
+	l.Info("Get list...")
 
 	switch s := storage.(type) {
 	case *MemStorage:
+		metrics := make([][]byte, s.len)
+		i := 0
 		s.Mtx.RLock()
 		for _, met := range s.items {
 			metrics[i] = met
 			i++
 		}
 		s.Mtx.RUnlock()
+		return metrics
+	default:
+		return nil
 	}
-
-	return metrics
-}
-
-func SetCond(inteval int, path string, restore bool) {
-	storeInterval = inteval
-	fileStorePath = path
-	restore = restore
 }
 
 func SetStorage(ots string) {
-	logger.Info("Set storage ...")
+	l.Info("Set storage ...")
 	switch ots {
 	case "file":
-		// fileStor, err := newFileStorage(fileStorePath, restore)
-		// if err != nil {
-		// 	logger.Warn("Problem with file storage", zap.Error(err))
-		// }
-		// storage = fileStor
 	default:
 		storage = newMemStorage()
 	}
 }
 
 func getInfo(input []byte) (string, string) {
-	typeBytes := gjson.GetBytes(input, m.Mtype)
-	mtype := typeBytes.String()
-	nameBytes := gjson.GetBytes(input, m.Id)
-	name := nameBytes.String()
+	mtype := gjson.GetBytes(input, m.Mtype).String()
+	name := gjson.GetBytes(input, m.ID).String()
+
 	return mtype, name
 }

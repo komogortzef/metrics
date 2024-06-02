@@ -1,60 +1,44 @@
 package server
 
 import (
-	"os"
 	"sync"
 
-	"metrics/internal/logger"
 	m "metrics/internal/models"
-)
-
-var (
-	storeInterval int
-	fileStorePath string
-	restore       bool
 )
 
 type (
 	MemStorage struct {
 		items map[string][]byte
+		len   int
 		Mtx   *sync.RWMutex
-	}
-
-	FileStorage struct {
-		Repository
-		file *os.File
 	}
 )
 
 func (ms *MemStorage) Write(input []byte) (int, error) {
 	mtype, name := getInfo(input)
 	ms.Mtx.Lock()
-	if mtype == m.Counter {
-		if old, ok := ms.items[name]; ok {
-			input = addCounter(old, input)
-		}
+	old, exists := ms.items[name]
+	if mtype == m.Counter && exists {
+		input = addCounter(old, input)
 	}
 	ms.items[name] = input
-	lenItems := len(ms.items)
+	if !exists {
+		ms.len++
+	}
 	ms.Mtx.Unlock()
 
-	return lenItems, nil
+	return len(input), nil
 }
 
-func (ms *MemStorage) Read(output *[]byte) (int, error) {
-	_, name := getInfo(*output)
-
+func (ms *MemStorage) Read(p []byte) ([]byte, error) {
+	_, name := getInfo(p)
 	var err error
 	ms.Mtx.RLock()
 	data, ok := ms.items[name]
 	ms.Mtx.RUnlock()
 	if !ok {
-		logger.Warn("NO VALUE!!")
 		err = m.ErrNoVal
 	}
 
-	*output = make([]byte, len(data))
-	copy(*output, data)
-
-	return len(*output), err
+	return data, err
 }

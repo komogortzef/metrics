@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"metrics/internal/logger"
+	l "metrics/internal/logger"
 	m "metrics/internal/models"
 
 	"github.com/caarlos0/env/v6"
@@ -41,7 +41,7 @@ func (o *options) setAddr(addr ...string) {
 	if len(addr) == 0 {
 		err := env.Parse(o)
 		if err != nil {
-			logger.Warn("Coulnd't parse env")
+			l.Warn("Coulnd't parse env")
 		}
 		if isValidAddr(o.Address) {
 			o.state |= addrArg
@@ -73,7 +73,7 @@ var WithEnvSrv = func(o *options) {
 	if val, ok := os.LookupEnv("STORE_INTERVAL"); ok {
 		num, err := strconv.Atoi(val)
 		if err != nil {
-			logger.Warn("Couldn't parse STORE_INTERVAL")
+			l.Warn("Couldn't parse STORE_INTERVAL")
 		} else {
 			o.storeInterval = num
 			o.state |= storIntervArg
@@ -85,14 +85,14 @@ var WithEnvSrv = func(o *options) {
 			o.fileStorage = val
 			o.state |= storPathArg
 		} else {
-			logger.Warn("Couldn't parse FILE_STORAGE_PATH")
+			l.Warn("Couldn't parse FILE_STORAGE_PATH")
 		}
 	}
 
 	if val, ok := os.LookupEnv("RESTORE"); ok {
 		yesno, err := strconv.ParseBool(val)
 		if err != nil {
-			logger.Warn("Couldn't parse RESTORE")
+			l.Warn("Couldn't parse RESTORE")
 		} else {
 			o.restore = yesno
 			o.state |= restoreArg
@@ -101,6 +101,9 @@ var WithEnvSrv = func(o *options) {
 }
 
 var WithCmdAg = func(o *options) {
+	if o.state == fullConfig {
+		return
+	}
 	addrFlag := flag.String("a", m.DefaultEndpoint, "Input the endpoint Address: <host:port>")
 	pollFlag := flag.Int("p", m.DefaultPollInterval, "Input the poll interval: <sec>")
 	repFlag := flag.Int("r", m.DefaultReportInterval, "Input the report interval: <sec>")
@@ -121,6 +124,9 @@ var WithCmdAg = func(o *options) {
 }
 
 var WithCmdSrv = func(o *options) {
+	if o.state == fullConfig {
+		return
+	}
 	addrFlag := flag.String("a", m.DefaultEndpoint, "Input the endpoint Address: <host:port>")
 	storInterFlag := flag.Int("i", m.DefaultStoreInterval, "Input the store interval: <sec>")
 	filePathFlag := flag.String("f", m.DefaultStorePath, "Input file storage path: </path/to/file")
@@ -141,7 +147,7 @@ var WithCmdSrv = func(o *options) {
 	if o.state&restoreArg == 0 {
 		yesno, err := strconv.ParseBool(*restoreFlag)
 		if err != nil {
-			logger.Warn("Couldn't parse RESTORE")
+			l.Warn("Couldn't parse RESTORE")
 		} else {
 			o.restore = yesno
 		}

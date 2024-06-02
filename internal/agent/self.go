@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"metrics/internal/logger"
+	l "metrics/internal/logger"
 	m "metrics/internal/models"
 
 	"go.uber.org/zap"
@@ -26,7 +26,7 @@ func (sm *SelfMonitor) Collect() {
 		sm.randVal = rand.Float64()
 		sm.pollCount++
 		sm.getMetrics()
-		logger.Debug("collect", zap.Int64("poll", sm.pollCount))
+		l.Debug("collect", zap.Int64("poll", sm.pollCount))
 		sm.Mtx.Unlock()
 		time.Sleep(time.Duration(pollInterval) * time.Second)
 	}
@@ -37,18 +37,18 @@ func (sm *SelfMonitor) Report() {
 	for {
 	sleep:
 		time.Sleep(time.Duration(reportInterval) * time.Second)
-		logger.Debug("sending...")
+		l.Debug("sending...")
 		sm.Mtx.RLock()
-		for _, metric := range sm.metrics {
+		for _, metric := range &sm.metrics {
 			err = send(metric)
 			if err != nil {
-				logger.Warn("Sending error", zap.Error(err))
+				l.Warn("Sending error", zap.Error(err))
 				sm.Mtx.RUnlock()
 				goto sleep
 			}
 		}
 		sm.pollCount = 0
-		logger.Info("Success sending!")
+		l.Info("Success sending!")
 		sm.Mtx.RUnlock()
 	}
 }
