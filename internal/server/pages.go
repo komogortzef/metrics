@@ -15,9 +15,9 @@ const getAllHTML = `<!DOCTYPE html>
   </head>
   <body>
   	<h1>All metrics</h1>
-	<ul>{{ range .Data}}
+	<ol>{{ range .Data}}
 	<li>{{ .Met}}</li>{{ end }}
-	</ul>
+	</ol>
   </body>
 </html>`
 

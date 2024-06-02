@@ -14,7 +14,7 @@ import (
 
 var router = chi.NewRouter()
 
-func NewServer(opts ...Option) (*http.Server, error) {
+func NewServer(opts ...func(*options)) (*http.Server, error) {
 	err := logger.InitLog()
 	if err != nil {
 		return nil, fmt.Errorf("init logger error: %w", err)
@@ -24,8 +24,8 @@ func NewServer(opts ...Option) (*http.Server, error) {
 	for _, opt := range opts {
 		opt(&options)
 	}
-	server.SetStorage("mem")
 
+	server.SetStorage("mem")
 	srv := &http.Server{
 		Addr:    options.Address,
 		Handler: router,
@@ -38,7 +38,7 @@ func NewServer(opts ...Option) (*http.Server, error) {
 		zap.Bool("restore", options.restore),
 	)
 
-	return srv, err
+	return srv, nil
 }
 
 func init() {

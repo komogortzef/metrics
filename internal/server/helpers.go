@@ -11,7 +11,7 @@ import (
 
 func newMemStorage() Repository {
 	return &MemStorage{
-		items: make(map[string][]byte, metricsNumber),
+		items: make(map[string][]byte, m.MetricsNumber),
 		Mtx:   &sync.RWMutex{},
 	}
 }
@@ -38,16 +38,13 @@ func newMemStorage() Repository {
 // }
 
 func addCounter(old []byte, input []byte) (new []byte) {
-	logger.Info("addCounter ...")
 	var newStruct m.Metrics
 	err := newStruct.UnmarshalJSON(old)
 	if err != nil {
 		logger.Warn("UNMARSHAL problems", zap.Error(err))
 	}
 	numBytes := gjson.GetBytes(input, m.Delta)
-	logger.Info("adding delta...")
 	*newStruct.Delta += numBytes.Int()
-
 	if new, err = newStruct.MarshalJSON(); err != nil {
 		logger.Warn("marshal problems", zap.Error(err))
 	}
@@ -56,14 +53,15 @@ func addCounter(old []byte, input []byte) (new []byte) {
 }
 
 func getList(storage Repository) [][]byte {
-	logger.Info("get list ...")
-	metrics := make([][]byte, 0, metricsNumber)
+	i := 0
+	metrics := make([][]byte, m.MetricsNumber)
 
 	switch s := storage.(type) {
 	case *MemStorage:
 		s.Mtx.RLock()
 		for _, met := range s.items {
-			metrics = append(metrics, met)
+			metrics[i] = met
+			i++
 		}
 		s.Mtx.RUnlock()
 	}

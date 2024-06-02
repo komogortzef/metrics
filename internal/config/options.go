@@ -2,10 +2,12 @@ package config
 
 import (
 	"flag"
-	"metrics/internal/logger"
 	"os"
 	"regexp"
 	"strconv"
+
+	"metrics/internal/logger"
+	m "metrics/internal/models"
 
 	"github.com/caarlos0/env/v6"
 )
@@ -18,12 +20,6 @@ const (
 	storPathArg   = 16 // 010000
 	restoreArg    = 32 // 100000
 	fullConfig    = 63 // 111111
-
-	defaultAddr           = "localhost:8080"
-	defaultPollInterval   = 2
-	defaultReportInterval = 10
-	defStorPath           = "/tmp/metrics-db.json"
-	defStorInterv         = 300
 )
 
 var (
@@ -40,8 +36,6 @@ type options struct {
 	restore        bool
 	state          uint8
 }
-
-type Option func(*options)
 
 func (o *options) setAddr(addr ...string) {
 	if len(addr) == 0 {
@@ -107,9 +101,9 @@ var WithEnvSrv = func(o *options) {
 }
 
 var WithCmdAg = func(o *options) {
-	addrFlag := flag.String("a", defaultAddr, "Input the endpoint Address: <host:port>")
-	pollFlag := flag.Int("p", defaultPollInterval, "Input the poll interval: <sec>")
-	repFlag := flag.Int("r", defaultReportInterval, "Input the report interval: <sec>")
+	addrFlag := flag.String("a", m.DefaultEndpoint, "Input the endpoint Address: <host:port>")
+	pollFlag := flag.Int("p", m.DefaultPollInterval, "Input the poll interval: <sec>")
+	repFlag := flag.Int("r", m.DefaultReportInterval, "Input the report interval: <sec>")
 	flag.Parse()
 
 	o.setAddr(*addrFlag)
@@ -127,10 +121,10 @@ var WithCmdAg = func(o *options) {
 }
 
 var WithCmdSrv = func(o *options) {
-	addrFlag := flag.String("a", defaultAddr, "Input the endpoint Address: <host:port>")
-	storInterFlag := flag.Int("i", defStorInterv, "Input the store interval: <sec>")
-	filePathFlag := flag.String("f", defStorPath, "Input file storage path: </path/to/file")
-	restoreFlag := flag.String("r", "true", "Input restore flag: <true|false")
+	addrFlag := flag.String("a", m.DefaultEndpoint, "Input the endpoint Address: <host:port>")
+	storInterFlag := flag.Int("i", m.DefaultStoreInterval, "Input the store interval: <sec>")
+	filePathFlag := flag.String("f", m.DefaultStorePath, "Input file storage path: </path/to/file")
+	restoreFlag := flag.String("r", m.DefaultRestore, "Input restore flag: <true|false")
 	flag.Parse()
 
 	o.setAddr(*addrFlag)

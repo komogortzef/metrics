@@ -15,18 +15,27 @@ type Metrics struct {
 	Value *float64 `json:"value,omitempty"`
 }
 
-// обертки для того чтобы обойти систему типов для методов интерферса Repository
-
 const (
+	MetricsNumber = 29
+
+	DefaultEndpoint       = "localhost:8080"
+	DefaultPollInterval   = 2
+	DefaultReportInterval = 10
+	DefaultStoreInterval  = 300
+	DefaultStorePath      = "/tmp/metrics-db.json"
+	DefaultRestore        = "true"
+	DefaultSendMode       = "text"
+
 	InternalErrorMsg  = "internal server error"
 	NotFoundMessage   = "not found"
 	BadRequestMessage = "bad request"
-	Gauge             = "gauge"
-	Counter           = "counter"
-	Mtype             = "type"
-	Id                = "id"
-	Value             = "value"
-	Delta             = "delta"
+
+	Gauge   = "gauge"
+	Counter = "counter"
+	Mtype   = "type"
+	Id      = "id"
+	Value   = "value"
+	Delta   = "delta"
 )
 
 var (
@@ -34,16 +43,11 @@ var (
 	ErrInvalidType = errors.New("invalid type")
 )
 
-func NewMetric(id, mtype string, val any) (Metrics, error) {
-	logger.Info("New Metric func...")
-
+func NewMetric(mtype, id string, val any) (Metrics, error) {
 	var metric Metrics
 	if mtype != Counter && mtype != Gauge {
 		return metric, ErrInvalidType
 	}
-	metric.MType = mtype
-	metric.ID = id
-
 	switch v := val.(type) {
 	case int64:
 		metric.Delta = &v
@@ -52,14 +56,12 @@ func NewMetric(id, mtype string, val any) (Metrics, error) {
 	case string:
 		logger.Info("string...")
 		if mtype == Counter {
-			logger.Info("int64string...")
 			num, err := strconv.ParseInt(v, 10, 64)
 			if err != nil {
 				return metric, ErrNoVal
 			}
 			metric.Delta = &num
 		} else {
-			logger.Info("float64string...")
 			num, err := strconv.ParseFloat(v, 64)
 			if err != nil {
 				return metric, ErrNoVal
@@ -68,15 +70,24 @@ func NewMetric(id, mtype string, val any) (Metrics, error) {
 		}
 	}
 
+	metric.MType = mtype
+	metric.ID = id
 	return metric, nil
+}
+
+func (met Metrics) Data() any {
+	if met.MType == Counter {
+		return *met.Delta
+	}
+	return *met.Value
 }
 
 func (met Metrics) String() string {
 	if met.Delta == nil && met.Value == nil {
-		return fmt.Sprintf("%s, %s: <empty>", met.MType, met.ID)
+		return fmt.Sprintf(" %s: <empty>", met.ID)
 	}
 	if met.MType == Counter {
-		return fmt.Sprintf("%s, %s: %d", met.MType, met.ID, *met.Delta)
+		return fmt.Sprintf(" %s: %d", met.ID, *met.Delta)
 	}
-	return fmt.Sprintf("%s, %s: %g", met.MType, met.ID, *met.Value)
+	return fmt.Sprintf(" %s: %g", met.ID, *met.Value)
 }

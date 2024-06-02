@@ -55,7 +55,7 @@ func GetHandler(rw http.ResponseWriter, req *http.Request) {
 	kind := chi.URLParam(req, m.Mtype)
 	name := chi.URLParam(req, m.Id)
 
-	metric, err := m.NewMetric(name, kind, 1000)
+	metric, err := m.NewMetric(name, kind, nil)
 	if errors.Is(m.ErrInvalidType, err) {
 		logger.Warn("Invalid metric type")
 		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
@@ -92,11 +92,11 @@ func GetHandler(rw http.ResponseWriter, req *http.Request) {
 func GetAllHandler(rw http.ResponseWriter, req *http.Request) {
 	logger.Debug("GET ALL HANDLER starts ...")
 	var metric m.Metrics
-	list := make([]Item, 0, metricsNumber)
+	list := make([]Item, m.MetricsNumber)
 
-	for _, bytes := range getList(storage) {
+	for i, bytes := range getList(storage) {
 		metric.UnmarshalJSON(bytes)
-		list = append(list, Item{Met: metric.String()})
+		list[i] = Item{Met: metric.String()}
 	}
 
 	html, err := renderGetAll(list)
