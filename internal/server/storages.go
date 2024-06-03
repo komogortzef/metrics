@@ -54,11 +54,10 @@ func (ms *MemStorage) Read(p []byte) ([]byte, error) {
 
 func (fs *FileStorage) Write(input []byte) (int, error) {
 	l.Info("File Store write...")
-	n, err := fs.Write(input)
+	n, err := fs.Repository.Write(input)
 	if err != nil {
 		return n, fmt.Errorf("save to memory: %w", err)
 	}
-
 	time.AfterFunc(time.Duration(fs.storeInterval)*time.Second, func() {
 		err = dump(fs.filePath, fs.Repository)
 	})

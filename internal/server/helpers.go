@@ -102,7 +102,6 @@ func getInfo(input []byte) (string, string) {
 
 func dump(path string, rep Repository) error {
 	metrics := getList(rep)
-
 	var err error
 	for _, metric := range metrics {
 		metric = append(metric, byte('\n'))
