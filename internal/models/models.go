@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 )
 
@@ -41,6 +42,10 @@ const (
 var (
 	ErrNoVal       = errors.New("metric without val")
 	ErrInvalidType = errors.New("invalid type")
+	ErrRestoreFile = errors.New("no file to restore")
+
+	IsValidAddr = regexp.MustCompile(`^(.*):(\d+)$`).MatchString
+	IsValidPath = regexp.MustCompile(`^(/[^/\0]+)+/?$`).MatchString
 )
 
 func NewMetric(id, mtype string, val any) (Metrics, error) {

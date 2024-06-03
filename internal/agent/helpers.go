@@ -13,20 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	memStats       = runtime.MemStats{}
-	address        string
-	pollInterval   int
-	reportInterval int
-	sendFormat     string = m.DefaultSendMode
-)
-
-func SetCond(addr, format string, poll, report int) {
-	address = addr
-	pollInterval = poll
-	reportInterval = report
-	sendFormat = format
-}
+var memStats = runtime.MemStats{}
 
 func (sm *SelfMonitor) getMetrics() {
 	sm.metrics = [m.MetricsNumber]m.Metrics{
@@ -62,9 +49,9 @@ func (sm *SelfMonitor) getMetrics() {
 	}
 }
 
-func send(metric m.Metrics) error {
-	baseurl := "http://" + address + "/update/"
-	switch sendFormat {
+func (sm *SelfMonitor) send(metric m.Metrics) error {
+	baseurl := "http://" + sm.Address + "/update/"
+	switch sm.SendFormat {
 	case "json":
 		jsonBytes, err := metric.MarshalJSON()
 		if err != nil {

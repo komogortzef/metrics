@@ -1,12 +1,13 @@
 package server
 
 import (
-	"fmt"
+	"os"
 	"sync"
 	"time"
 
-	l "metrics/internal/logger"
 	m "metrics/internal/models"
+
+	"github.com/tidwall/gjson"
 )
 
 type (
@@ -17,18 +18,21 @@ type (
 	}
 
 	FileStorage struct {
-		Repository
+		MemStorage
 		filePath      string
 		storeInterval int
+		Timer         *time.Timer
 	}
 )
 
 func (ms *MemStorage) Write(input []byte) (int, error) {
-	mtype, name := getInfo(input)
+	mtype := gjson.GetBytes(input, m.Mtype).String()
+	name := gjson.GetBytes(input, m.ID).String()
+	var err error
 	ms.Mtx.Lock()
 	old, exists := ms.items[name]
 	if mtype == m.Counter && exists {
-		input = addCounter(old, input)
+		input, err = addCounter(old, input)
 	}
 	ms.items[name] = input
 	if !exists {
@@ -36,31 +40,26 @@ func (ms *MemStorage) Write(input []byte) (int, error) {
 	}
 	ms.Mtx.Unlock()
 
-	return len(input), nil
+	return ms.len, err
 }
 
-func (ms *MemStorage) Read(p []byte) ([]byte, error) {
-	_, name := getInfo(p)
-	var err error
+func (ms *MemStorage) Get(name string) ([]byte, bool) {
 	ms.Mtx.RLock()
 	data, ok := ms.items[name]
 	ms.Mtx.RUnlock()
-	if !ok {
-		err = m.ErrNoVal
-	}
 
-	return data, err
+	return data, ok
 }
 
-func (fs *FileStorage) Write(input []byte) (int, error) {
-	l.Info("File Store write...")
-	n, err := fs.Repository.Write(input)
-	if err != nil {
-		return n, fmt.Errorf("save to memory: %w", err)
-	}
-	time.AfterFunc(time.Duration(fs.storeInterval)*time.Second, func() {
-		err = dump(fs.filePath, fs.Repository)
-	})
+func (fs *FileStorage) Dump() error {
+	var buf []byte
 
-	return 0, nil
+	fs.Mtx.RLock()
+	for _, data := range fs.items {
+		data = append(data, byte('\n'))
+		buf = append(buf, data...)
+	}
+	fs.Mtx.RUnlock()
+
+	return os.WriteFile(fs.filePath, buf, 0666)
 }

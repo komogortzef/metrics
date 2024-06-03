@@ -14,17 +14,17 @@ import (
 	"go.uber.org/zap"
 )
 
-func newMemStorage() Repository {
-	return &MemStorage{
+func NewMemStorage() MemStorage {
+	return MemStorage{
 		items: make(map[string][]byte, m.MetricsNumber),
 		Mtx:   &sync.RWMutex{},
 	}
 }
 
-func NewFileStorage(interval int, path string, restore bool) error {
+func NewFileStorage(interval int, path string, restore bool) (*FileStorage, error) {
 	l.Debug("New file storage ...")
 	fileStorage := FileStorage{
-		Repository:    newMemStorage(),
+		MemStorage:    NewMemStorage(),
 		filePath:      path,
 		storeInterval: interval,
 	}
@@ -32,37 +32,33 @@ func NewFileStorage(interval int, path string, restore bool) error {
 	if restore {
 		b, err := os.ReadFile(fileStorage.filePath)
 		if err != nil {
-			return fmt.Errorf("read file error: %w", err)
+			return &fileStorage, m.ErrRestoreFile
 		}
 		buff := bytes.NewBuffer(b)
 		scanner := bufio.NewScanner(buff)
 		scanner.Split(bufio.ScanLines)
+		var len int
 		for scanner.Scan() {
-			_, err = fileStorage.Repository.Write(scanner.Bytes())
+			len, err = fileStorage.MemStorage.Write(scanner.Bytes())
 			if err != nil {
-				return fmt.Errorf("write to mem error: %w", err)
+				return &fileStorage, fmt.Errorf("write to mem error: %w", err)
 			}
 		}
+		l.Info("saved items number", zap.Int("items", len))
 	}
-
-	storage = &fileStorage
-	return nil
+	return &fileStorage, nil
 }
 
-func addCounter(old []byte, input []byte) []byte {
+func addCounter(old []byte, input []byte) ([]byte, error) {
 	var oldStruct m.Metrics
 	err := oldStruct.UnmarshalJSON(old)
 	if err != nil {
-		l.Warn("UNMARSHAL problems", zap.Error(err))
+		return nil, fmt.Errorf("Unmarshal error: %w", err)
 	}
 	numBytes := gjson.GetBytes(input, m.Delta)
 	*oldStruct.Delta += numBytes.Int()
-	bytes, err := oldStruct.MarshalJSON()
-	if err != nil {
-		l.Warn("marshal problems", zap.Error(err))
-	}
 
-	return bytes
+	return oldStruct.MarshalJSON()
 }
 
 func getList(storage Repository) [][]byte {
@@ -70,43 +66,22 @@ func getList(storage Repository) [][]byte {
 
 	switch s := storage.(type) {
 	case *MemStorage:
-		metrics := make([][]byte, s.len)
-		i := 0
-		s.Mtx.RLock()
-		for _, met := range s.items {
-			metrics[i] = met
-			i++
-		}
-		s.Mtx.RUnlock()
-		return metrics
+		return listFromMem(s)
+	case *FileStorage:
+		return listFromMem(&s.MemStorage)
 	default:
 		return nil
 	}
 }
 
-func SetStorage(ots string) {
-	l.Info("Set storage ...")
-	switch ots {
-	case "file":
-	default:
-		storage = newMemStorage()
+func listFromMem(ms *MemStorage) [][]byte {
+	metrics := make([][]byte, ms.len)
+	i := 0
+	ms.Mtx.RLock()
+	for _, met := range ms.items {
+		metrics[i] = met
+		i++
 	}
-}
-
-func getInfo(input []byte) (string, string) {
-	mtype := gjson.GetBytes(input, m.Mtype).String()
-	name := gjson.GetBytes(input, m.ID).String()
-
-	return mtype, name
-}
-
-func dump(path string, rep Repository) error {
-	metrics := getList(rep)
-	var err error
-	for _, metric := range metrics {
-		metric = append(metric, byte('\n'))
-		err = os.WriteFile(path, metric, 0666)
-	}
-
-	return err
+	ms.Mtx.RUnlock()
+	return metrics
 }

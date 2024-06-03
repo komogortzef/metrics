@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"sync"
 
 	"metrics/internal/agent"
@@ -10,23 +9,19 @@ import (
 	"go.uber.org/zap"
 )
 
-func NewAgent(opts ...func(*options)) (*agent.SelfMonitor, error) {
-	if err := l.InitLog(); err != nil {
-		return nil, fmt.Errorf("init logger error: %w", err)
+func newAgent(opts *options) (*agent.SelfMonitor, error) {
+	agent := agent.SelfMonitor{
+		Address:        opts.Address,
+		PollInterval:   opts.PollInterval,
+		ReportInterval: opts.ReportInterval,
+		SendFormat:     "json",
+		Mtx:            &sync.RWMutex{},
 	}
-
-	var options options
-	for _, option := range opts {
-		option(&options)
-	}
-
-	agent.SetCond(
-		options.Address, "json", options.PollInterval, options.ReportInterval)
 
 	l.Info("Agent config",
-		zap.String("addr", options.Address),
-		zap.Int("poll count", options.PollInterval),
-		zap.Int("report interval", options.ReportInterval))
+		zap.String("addr", opts.Address),
+		zap.Int("poll count", opts.PollInterval),
+		zap.Int("report interval", opts.ReportInterval))
 
-	return &agent.SelfMonitor{Mtx: &sync.RWMutex{}}, nil
+	return &agent, nil
 }

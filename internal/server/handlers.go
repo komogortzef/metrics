@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -16,18 +15,26 @@ import (
 
 type Repository interface {
 	io.Writer
-	Read([]byte) ([]byte, error)
+	Get(string) ([]byte, bool)
 }
 
-var storage Repository
+type MetricsManager struct {
+	Serv    *http.Server
+	Storage Repository
+}
 
-func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
+func (mm *MetricsManager) Run() error {
+
+	return mm.Serv.ListenAndServe()
+}
+
+func (mm *MetricsManager) UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 	l.Debug("UPDATE HANDLER starts ...")
-	kind := chi.URLParam(req, m.Mtype)
-	name := chi.URLParam(req, m.ID)
-	val := chi.URLParam(req, m.Value)
-
-	metric, err := m.NewMetric(name, kind, val)
+	metric, err := m.NewMetric(
+		chi.URLParam(req, m.ID),
+		chi.URLParam(req, m.Mtype),
+		chi.URLParam(req, m.Value),
+	)
 	if err != nil {
 		l.Warn("Invalid metric value or type")
 		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
@@ -38,35 +45,22 @@ func UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 		l.Warn("Marshal error", zap.Error(err))
 	}
 
-	_, err = storage.Write(bytes)
+	_, err = mm.Storage.Write(bytes)
 	if err != nil {
-		l.Fatal("Put to storage error", zap.Error(err))
+		l.Warn("Put to mm.Storage error", zap.Error(err))
 	}
 
 	rw.WriteHeader(http.StatusOK)
 }
 
-func GetHandler(rw http.ResponseWriter, req *http.Request) {
+func (mm *MetricsManager) GetHandler(rw http.ResponseWriter, req *http.Request) {
 	l.Debug("GET HANDLER starts ...")
-
 	kind := chi.URLParam(req, m.Mtype)
 	name := chi.URLParam(req, m.ID)
 
-	metric, err := m.NewMetric(name, kind, nil)
-	if errors.Is(m.ErrInvalidType, err) {
-		l.Warn("Invalid metric type")
-		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
-		return
-	}
-
-	bytes, err := metric.MarshalJSON()
-	if err != nil {
-		l.Warn("Marshal problem", zap.Error(err))
-	}
-
-	newBytes, err := storage.Read(bytes)
-	if err != nil {
-		l.Warn("Coundn't fetch the metric from storage")
+	newBytes, ok := mm.Storage.Get(name)
+	if !ok {
+		l.Warn("Coundn't fetch the metric from mm.Storage")
 		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
 		return
 	}
@@ -83,12 +77,12 @@ func GetHandler(rw http.ResponseWriter, req *http.Request) {
 	_, _ = rw.Write([]byte(numStr))
 }
 
-func GetAllHandler(rw http.ResponseWriter, req *http.Request) {
+func (mm *MetricsManager) GetAllHandler(rw http.ResponseWriter, req *http.Request) {
 	l.Debug("GET ALL HANDLER starts ...")
 	list := make([]Item, 0, m.MetricsNumber)
 
 	var metric m.Metrics
-	for _, bytes := range getList(storage) {
+	for _, bytes := range getList(mm.Storage) {
 		_ = metric.UnmarshalJSON(bytes)
 		list = append(list, Item{Met: metric.String()})
 	}
@@ -105,7 +99,7 @@ func GetAllHandler(rw http.ResponseWriter, req *http.Request) {
 	_, _ = rw.Write(html.Bytes())
 }
 
-func UpdateJSON(rw http.ResponseWriter, req *http.Request) {
+func (mm *MetricsManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) {
 	l.Info("UpdateJSON starts...")
 	bytes, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -113,21 +107,22 @@ func UpdateJSON(rw http.ResponseWriter, req *http.Request) {
 	}
 	defer req.Body.Close()
 
-	typeBytes := gjson.GetBytes(bytes, m.Mtype)
-	mtype := typeBytes.String()
+	mtype := gjson.GetBytes(bytes, m.Mtype).String()
 	if mtype != m.Counter && mtype != m.Gauge {
 		l.Info("Invalid metric type")
 		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
 		return
 	}
-	if _, err = storage.Write(bytes); err != nil {
-		l.Warn("Coudn't save data to storage")
+	if _, err = mm.Storage.Write(bytes); err != nil {
+		l.Warn("Coudn't save data to mm.Storage")
 	}
 	newBytes := bytes
 	if mtype == m.Counter {
-		newBytes, err = storage.Read(bytes)
-		if err != nil {
-			l.Warn("Coulnd't fetch the metric from storage")
+		name := gjson.GetBytes(bytes, m.Delta).String()
+		var ok bool
+		newBytes, ok = mm.Storage.Get(name)
+		if !ok {
+			l.Warn("Coulnd't fetch the metric from mm.Storage")
 		}
 	}
 
@@ -135,7 +130,7 @@ func UpdateJSON(rw http.ResponseWriter, req *http.Request) {
 	_, _ = rw.Write(newBytes)
 }
 
-func GetJSON(rw http.ResponseWriter, req *http.Request) {
+func (mm *MetricsManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 	l.Info("GetJSON starts...")
 	bytes, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -150,8 +145,9 @@ func GetJSON(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	newBytes, err := storage.Read(bytes)
-	if err != nil {
+	name := gjson.GetBytes(bytes, m.ID).String()
+	newBytes, ok := mm.Storage.Get(name)
+	if !ok {
 		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
 		return
 	}

@@ -12,19 +12,33 @@ import (
 	"go.uber.org/zap"
 )
 
-var router = chi.NewRouter()
+func newServer(options *options) (*server.MetricsManager, error) {
+	var manager server.MetricsManager
 
-func NewServer(opts ...func(*options)) (*http.Server, error) {
-	err := l.InitLog()
-	if err != nil {
-		return nil, fmt.Errorf("init l error: %w", err)
+	if options.fileStorage == "" {
+		mem := server.NewMemStorage()
+		manager.Storage = &mem
+	} else {
+		fileStore, err := server.NewFileStorage(
+			options.storeInterval,
+			options.fileStorage,
+			options.restore,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("set storage error: %w", err)
+		}
+		manager.Storage = fileStore
 	}
-	var options options
-	for _, opt := range opts {
-		opt(&options)
-	}
-	server.SetStorage("mem")
-	srv := &http.Server{
+
+	router := chi.NewRouter()
+	router.Use(l.WithHandlerLog)
+	router.Get("/", c.GzipMiddleware(manager.GetAllHandler))
+	router.Post("/value/", c.GzipMiddleware(manager.GetJSON))
+	router.Get("/value/{type}/{id}", manager.GetHandler)
+	router.Post("/update/", c.GzipMiddleware(manager.UpdateJSON))
+	router.Post("/update/{type}/{id}/{value}", manager.UpdateHandler)
+
+	manager.Serv = &http.Server{
 		Addr:    options.Address,
 		Handler: router,
 	}
@@ -35,14 +49,5 @@ func NewServer(opts ...func(*options)) (*http.Server, error) {
 		zap.Bool("restore", options.restore),
 	)
 
-	return srv, nil
-}
-
-func init() {
-	router.Use(l.WithHandlerLog)
-	router.Get("/", c.GzipMiddleware(server.GetAllHandler))
-	router.Post("/value/", c.GzipMiddleware(server.GetJSON))
-	router.Get("/value/{type}/{id}", server.GetHandler)
-	router.Post("/update/", c.GzipMiddleware(server.UpdateJSON))
-	router.Post("/update/{type}/{id}/{value}", server.UpdateHandler)
+	return &manager, nil
 }

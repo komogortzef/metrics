@@ -2,8 +2,8 @@ package config
 
 import (
 	"flag"
+	"fmt"
 	"os"
-	"regexp"
 	"strconv"
 
 	l "metrics/internal/logger"
@@ -12,31 +12,24 @@ import (
 	"github.com/caarlos0/env/v6"
 )
 
-const (
-	addrArg         = 1  // 000001
-	pollArg         = 2  // 000010
-	reportArg       = 4  // 000100
-	storIntervArg   = 8  // 001000
-	storPathArg     = 16 // 010000
-	restoreArg      = 32 // 100000
-	fullAgentConfig = 56 // 111000
-	fullServConfig  = 7  // 000111
-)
+type (
+	Service interface {
+		Run() error
+	}
 
-var (
-	isValidAddr = regexp.MustCompile(`^(.*):(\d+)$`).MatchString
-	isValidPath = regexp.MustCompile(`^(/[^/\0]+)+/?$`).MatchString
-)
+	agentEnv struct {
+		Address        string `env:"ADDRESS"`
+		PollInterval   int    `env:"POLL_INTERVAL"`
+		ReportInterval int    `env:"REPORT_INTERVAL"`
+	}
 
-type options struct {
-	Address        string `env:"ADDRESS"`
-	PollInterval   int    `env:"POLL_INTERVAL"`
-	ReportInterval int    `env:"REPORT_INTERVAL"`
-	storeInterval  int
-	fileStorage    string
-	restore        bool
-	state          uint8
-}
+	serverEnv struct {
+		Address         string `env:"ADDRESS"`
+		StoreInterval   int    `env:"STORE_INTERVAL"`
+		FileStoragePath string `env:"FILE_STORAGE_PATH"`
+		Restore         bool   `env:"RESTORE"`
+	}
+)
 
 func (o *options) setAddr(addr ...string) {
 	if len(addr) == 0 {
@@ -44,20 +37,21 @@ func (o *options) setAddr(addr ...string) {
 		if err != nil {
 			l.Warn("Coulnd't parse env")
 		}
-		if isValidAddr(o.Address) {
+		if m.IsValidAddr(o.Address) {
 			o.state |= addrArg
 		}
 		return
 	}
 
 	if o.state&addrArg == 0 {
-		if isValidAddr(addr[0]) {
+		if m.IsValidAddr(addr[0]) {
 			o.Address = addr[0]
 		}
 	}
 }
 
 var WithEnvAg = func(o *options) {
+	o.state |= seniorBitMask
 	o.setAddr()
 
 	if o.PollInterval > 0 {
@@ -82,7 +76,7 @@ var WithEnvSrv = func(o *options) {
 	}
 
 	if val, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok {
-		if isValidPath(val) {
+		if m.IsValidPath(val) {
 			o.fileStorage = val
 			o.state |= storPathArg
 		} else {
@@ -105,6 +99,7 @@ var WithCmdAg = func(o *options) {
 	if o.state == fullAgentConfig {
 		return
 	}
+	o.state |= seniorBitMask
 
 	addrFlag := flag.String(
 		"a", m.DefaultEndpoint, "Input the endpoint Address: <host:port>")
@@ -169,4 +164,24 @@ var WithCmdSrv = func(o *options) {
 			o.restore = yesno
 		}
 	}
+}
+
+func Configure(opts ...func(*options)) (Service, error) {
+	err := l.InitLog()
+	if err != nil {
+		return nil, fmt.Errorf("init logger error: %w", err)
+	}
+	var options options
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	var service Service
+	if options.state>>7 == 1 {
+		service, err = newAgent(&options)
+	} else {
+		service, err = newServer(&options)
+	}
+
+	return service, err
 }

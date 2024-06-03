@@ -13,10 +13,14 @@ import (
 )
 
 type SelfMonitor struct {
-	metrics   [m.MetricsNumber]m.Metrics
-	randVal   float64
-	pollCount int64
-	Mtx       *sync.RWMutex
+	metrics        [m.MetricsNumber]m.Metrics
+	randVal        float64
+	pollCount      int64
+	Address        string
+	PollInterval   int
+	ReportInterval int
+	SendFormat     string
+	Mtx            *sync.RWMutex
 }
 
 func (sm *SelfMonitor) Collect() {
@@ -28,7 +32,7 @@ func (sm *SelfMonitor) Collect() {
 		sm.getMetrics()
 		l.Debug("collect", zap.Int64("poll", sm.pollCount))
 		sm.Mtx.Unlock()
-		time.Sleep(time.Duration(pollInterval) * time.Second)
+		time.Sleep(time.Duration(sm.PollInterval) * time.Second)
 	}
 }
 
@@ -36,11 +40,11 @@ func (sm *SelfMonitor) Report() {
 	var err error
 	for {
 	sleep:
-		time.Sleep(time.Duration(reportInterval) * time.Second)
+		time.Sleep(time.Duration(sm.ReportInterval) * time.Second)
 		l.Debug("sending...")
 		sm.Mtx.RLock()
 		for _, metric := range &sm.metrics {
-			err = send(metric)
+			err = sm.send(metric)
 			if err != nil {
 				l.Warn("Sending error", zap.Error(err))
 				sm.Mtx.RUnlock()
@@ -53,7 +57,9 @@ func (sm *SelfMonitor) Report() {
 	}
 }
 
-func (sm *SelfMonitor) Run() {
+func (sm *SelfMonitor) Run() error {
 	go sm.Collect()
 	sm.Report()
+
+	return nil
 }
