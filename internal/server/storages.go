@@ -1,8 +1,11 @@
 package server
 
 import (
+	"fmt"
 	"sync"
+	"time"
 
+	l "metrics/internal/logger"
 	m "metrics/internal/models"
 )
 
@@ -11,6 +14,12 @@ type (
 		items map[string][]byte
 		len   int
 		Mtx   *sync.RWMutex
+	}
+
+	FileStorage struct {
+		Repository
+		filePath      string
+		storeInterval int
 	}
 )
 
@@ -41,4 +50,18 @@ func (ms *MemStorage) Read(p []byte) ([]byte, error) {
 	}
 
 	return data, err
+}
+
+func (fs *FileStorage) Write(input []byte) (int, error) {
+	l.Info("File Store write...")
+	n, err := fs.Write(input)
+	if err != nil {
+		return n, fmt.Errorf("save to memory: %w", err)
+	}
+
+	time.AfterFunc(time.Duration(fs.storeInterval)*time.Second, func() {
+		err = dump(fs.filePath, fs.Repository)
+	})
+
+	return 0, nil
 }

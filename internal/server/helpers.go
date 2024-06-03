@@ -1,6 +1,10 @@
 package server
 
 import (
+	"bufio"
+	"bytes"
+	"fmt"
+	"os"
 	"sync"
 
 	l "metrics/internal/logger"
@@ -15,6 +19,34 @@ func newMemStorage() Repository {
 		items: make(map[string][]byte, m.MetricsNumber),
 		Mtx:   &sync.RWMutex{},
 	}
+}
+
+func NewFileStorage(interval int, path string, restore bool) error {
+	l.Debug("New file storage ...")
+	fileStorage := FileStorage{
+		Repository:    newMemStorage(),
+		filePath:      path,
+		storeInterval: interval,
+	}
+
+	if restore {
+		b, err := os.ReadFile(fileStorage.filePath)
+		if err != nil {
+			return fmt.Errorf("read file error: %w", err)
+		}
+		buff := bytes.NewBuffer(b)
+		scanner := bufio.NewScanner(buff)
+		scanner.Split(bufio.ScanLines)
+		for scanner.Scan() {
+			_, err = fileStorage.Repository.Write(scanner.Bytes())
+			if err != nil {
+				return fmt.Errorf("write to mem error: %w", err)
+			}
+		}
+	}
+
+	storage = &fileStorage
+	return nil
 }
 
 func addCounter(old []byte, input []byte) []byte {
@@ -66,4 +98,16 @@ func getInfo(input []byte) (string, string) {
 	name := gjson.GetBytes(input, m.ID).String()
 
 	return mtype, name
+}
+
+func dump(path string, rep Repository) error {
+	metrics := getList(rep)
+
+	var err error
+	for _, metric := range metrics {
+		metric = append(metric, byte('\n'))
+		err = os.WriteFile(path, metric, 0666)
+	}
+
+	return err
 }
