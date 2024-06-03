@@ -13,13 +13,14 @@ import (
 )
 
 const (
-	addrArg       = 1  // 000001
-	pollArg       = 2  // 000010
-	reportArg     = 4  // 000100
-	storIntervArg = 8  // 001000
-	storPathArg   = 16 // 010000
-	restoreArg    = 32 // 100000
-	fullConfig    = 63 // 111111
+	addrArg         = 1  // 000001
+	pollArg         = 2  // 000010
+	reportArg       = 4  // 000100
+	storIntervArg   = 8  // 001000
+	storPathArg     = 16 // 010000
+	restoreArg      = 32 // 100000
+	fullAgentConfig = 56 // 111000
+	fullServConfig  = 7  // 000111
 )
 
 var (
@@ -101,12 +102,19 @@ var WithEnvSrv = func(o *options) {
 }
 
 var WithCmdAg = func(o *options) {
-	if o.state == fullConfig {
+	if o.state == fullAgentConfig {
 		return
 	}
-	addrFlag := flag.String("a", m.DefaultEndpoint, "Input the endpoint Address: <host:port>")
-	pollFlag := flag.Int("p", m.DefaultPollInterval, "Input the poll interval: <sec>")
-	repFlag := flag.Int("r", m.DefaultReportInterval, "Input the report interval: <sec>")
+
+	addrFlag := flag.String(
+		"a", m.DefaultEndpoint, "Input the endpoint Address: <host:port>")
+
+	pollFlag := flag.Int(
+		"p", m.DefaultPollInterval, "Input the poll interval: <sec>")
+
+	repFlag := flag.Int(
+		"r", m.DefaultReportInterval, "Input the report interval: <sec>")
+
 	flag.Parse()
 
 	o.setAddr(*addrFlag)
@@ -124,13 +132,22 @@ var WithCmdAg = func(o *options) {
 }
 
 var WithCmdSrv = func(o *options) {
-	if o.state == fullConfig {
+	if o.state == fullServConfig {
 		return
 	}
-	addrFlag := flag.String("a", m.DefaultEndpoint, "Input the endpoint Address: <host:port>")
-	storInterFlag := flag.Int("i", m.DefaultStoreInterval, "Input the store interval: <sec>")
-	filePathFlag := flag.String("f", m.DefaultStorePath, "Input file storage path: </path/to/file")
-	restoreFlag := flag.String("r", m.DefaultRestore, "Input restore flag: <true|false")
+
+	addrFlag := flag.String(
+		"a", m.DefaultEndpoint, "Input the endpoint Address: <host:port>")
+
+	storInterFlag := flag.Int(
+		"i", m.DefaultStoreInterval, "Input the store interval: <sec>")
+
+	filePathFlag := flag.String(
+		"f", m.DefaultStorePath, "Input file storage path: </path/to/file")
+
+	restoreFlag := flag.String(
+		"r", m.DefaultRestore, "Input restore flag: <true|false")
+
 	flag.Parse()
 
 	o.setAddr(*addrFlag)

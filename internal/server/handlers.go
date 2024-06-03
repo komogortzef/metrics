@@ -143,8 +143,7 @@ func GetJSON(rw http.ResponseWriter, req *http.Request) {
 	}
 	defer req.Body.Close()
 
-	typeBytes := gjson.GetBytes(bytes, m.Mtype)
-	mtype := typeBytes.String()
+	mtype := gjson.GetBytes(bytes, m.Mtype).String()
 	if mtype != m.Counter && mtype != m.Gauge {
 		l.Info("Invalid metric type")
 		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
