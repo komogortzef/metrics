@@ -22,11 +22,12 @@ func NewMemStorage() MemStorage {
 	}
 }
 
-func NewFileStorage(interval int, path string, restore bool) (*FileStorage, error) {
+func NewFileStorage(interv int, path string, restore bool) (*FileStorage, error) {
 	l.Debug("New file storage ...")
 	fileStorage := FileStorage{
 		MemStorage: NewMemStorage(),
 		filePath:   path,
+		interval:   time.Duration(interv),
 	}
 
 	if restore {
@@ -46,13 +47,6 @@ func NewFileStorage(interval int, path string, restore bool) (*FileStorage, erro
 		}
 		l.Info("saved items number", zap.Int("items", len))
 	}
-
-	time.AfterFunc(time.Duration(interval)*time.Second, func() {
-		l.Info("timer gorutine start")
-		if err := fileStorage.dump(); err != nil {
-			l.Warn("Couldn't dump data!!")
-		}
-	})
 
 	return &fileStorage, nil
 }

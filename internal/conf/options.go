@@ -101,20 +101,22 @@ func (cfg *serverConfig) SetConfig() (Configurable, error) {
 		Handler: router,
 	}
 
-	// if cfg.FileStoragePath == "" {
-	mem := server.NewMemStorage()
-	manager.Store = &mem
-	// } else {
-	// 	fileStore, err := server.NewFileStorage(
-	// 		cfg.StoreInterval,
-	// 		cfg.FileStoragePath,
-	// 		cfg.Restore,
-	// 	)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("set storage error: %w", err)
-	// 	}
-	// 	manager.Store = fileStore
-	// }
+	if cfg.FileStoragePath == "" {
+		mem := server.NewMemStorage()
+		manager.Store = &mem
+	} else {
+		fileStore, err := server.NewFileStorage(
+			cfg.StoreInterval,
+			cfg.FileStoragePath,
+			cfg.Restore,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("set storage error: %w", err)
+		}
+		manager.Store = fileStore
+
+		fileStore.StartTicker()
+	}
 
 	l.Info("Serv config:",
 		zap.String("addr", cfg.Address),

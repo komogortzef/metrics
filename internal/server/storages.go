@@ -3,6 +3,7 @@ package server
 import (
 	"os"
 	"sync"
+	"time"
 
 	l "metrics/internal/logger"
 	m "metrics/internal/models"
@@ -20,6 +21,7 @@ type (
 	FileStorage struct {
 		MemStorage
 		filePath string
+		interval time.Duration
 	}
 )
 
@@ -73,4 +75,23 @@ func (fs *FileStorage) dump() error {
 	fs.Mtx.RUnlock()
 
 	return os.WriteFile(fs.filePath, buf, 0666)
+}
+
+func (fs *FileStorage) StartTicker() {
+	l.Info("startTicker...")
+	ticker := time.NewTicker(fs.interval * time.Second)
+
+	go func() {
+		l.Info("gorutine runnning")
+		for {
+			select {
+			case <-ticker.C:
+				l.Info("time up from gorutine!")
+				if err := fs.dump(); err != nil {
+					l.Warn("Coulnd't save data to file")
+					return
+				}
+			}
+		}
+	}()
 }
