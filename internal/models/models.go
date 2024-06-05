@@ -3,7 +3,6 @@ package models
 import (
 	"errors"
 	"fmt"
-	"math"
 	"regexp"
 	"strconv"
 )
@@ -64,14 +63,6 @@ func NewMetric(id, mtype string, val any) (Metrics, error) {
 	metric.MType = mtype
 	metric.ID = id
 	switch v := val.(type) {
-	case nil:
-		if mtype == Counter {
-			delta := int64(math.MaxInt64)
-			metric.Delta = &delta
-		} else {
-			value := float64(math.MaxFloat64)
-			metric.Value = &value
-		}
 	case int64:
 		metric.Delta = &v
 	case float64:
