@@ -1,4 +1,4 @@
-package config
+package conf
 
 import (
 	"flag"
@@ -17,11 +17,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	noStrValue = "none"
-	noIntValue = "-1"
-)
-
 type (
 	Configurable interface {
 		Run() error
@@ -32,49 +27,70 @@ type (
 	}
 
 	agentConfig struct {
-		Address        string `env:"ADDRESS, notEmpty"`
-		PollInterval   int    `env:"POLL_INTERVAL, notEmpty"`
-		ReportInterval int    `env:"REPORT_INTERVAL, notEmpty"`
+		Address        string `env:"ADDRESS" envDefault:"none"`
+		PollInterval   int    `env:"POLL_INTERVAL" envDefault:"-1"`
+		ReportInterval int    `env:"REPORT_INTERVAL" envDefault:"-1"`
 	}
 
 	serverConfig struct {
-		Address         string `env:"ADDRESS, notEmpty"`
-		StoreInterval   int    `env:"STORE_INTERVA, notEmpty"`
-		FileStoragePath string `env:"FILE_STORAGE_PATH, notEmpty"`
-		Restore         string `env:"RESTORE, notEmpty"`
+		Address         string `env:"ADDRESS" envDefault:"none"`
+		StoreInterval   int    `env:"STORE_INTERVAL" envDefault:"-1"`
+		FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"none"`
+		Restore         bool   `env:"RESTORE" envDefault:"true"`
 	}
 
 	Option func(Config) error
 )
 
-func WithEnv(cfg Config) error {
-
-	return nil
-}
-
-func WithEnvAndCmd(cfg Config) error {
-	addrOpt := env.Options{
-		OnSet: func(tag string, value any, isDefault bool) {
-			address := flag.String("a", m.DefaultEndpoint, "Endpoint arg: -a <HOST:PORT>")
-
-		},
+func WithEnvCmd(cfg Config) error {
+	var err error
+	if err = env.Parse(cfg); err != nil {
+		return fmt.Errorf("env parse error: %w", err)
 	}
 
+	addr := flag.String("a", m.DefaultEndpoint, "Endpoint arg: -a <host:port>")
 	switch c := cfg.(type) {
-	case agentConfig:
+	case *agentConfig:
 		poll := flag.Int("p", m.DefaultPollInterval, "Poll Interval arg: -p <sec>")
-		report := flag.Int("r", m.DefaultReportInterval, "Report Interval arg: -r <sec>")
+		rep := flag.Int("r", m.DefaultReportInterval, "Report interval arg: -r <sec>")
 		flag.Parse()
-	case serverConfig:
-		storeInterval := flag.Int("i", m.DefaultStoreInterval, "Store Interval arg: -i <sec>")
-		fStorePath := flag.String("f", m.DefaultStorePath, "File path arg: -f </path/to/file>")
-		restore := flag.Bool("r", m.DefaultRestore, "Restore option arg: -r <true|false>")
+		if c.Address == "none" {
+			c.Address = *addr
+		}
+		if c.PollInterval < 0 {
+			c.PollInterval = *poll
+		}
+		if c.ReportInterval < 0 {
+			c.ReportInterval = *rep
+		}
+	case *serverConfig:
+		l.Info("server config in withcmdenv")
+		fmt.Println("serverConf:", c)
+		storeInterv := flag.Int("i", m.DefaultStoreInterval, "Store interval arg: -i <sec>")
+		filePath := flag.String("f", m.DefaultStorePath, "File path arg: -f </path/to/file>")
+		rest := flag.Bool("r", m.DefaultRestore, "Restore storage arg: -r <true|false")
+		flag.Parse()
+
+		fmt.Println("serverConf:", c)
+		if c.Address == "none" {
+			c.Address = *addr
+		}
+		if c.StoreInterval < 0 {
+			c.StoreInterval = *storeInterv
+		}
+		if c.FileStoragePath == "none" {
+			c.FileStoragePath = *filePath
+		}
+		if c.Restore {
+			c.Restore = *rest
+		}
+		fmt.Println("serverConf:", c)
 	}
 
-	return nil
+	return err
 }
 
-func (cfg serverConfig) SetConfig() (Configurable, error) {
+func (cfg *serverConfig) SetConfig() (Configurable, error) {
 	var manager server.MetricsManager
 
 	router := chi.NewRouter()
@@ -115,7 +131,7 @@ func (cfg serverConfig) SetConfig() (Configurable, error) {
 	return &manager, nil
 }
 
-func (cfg agentConfig) SetConfig() (Configurable, error) {
+func (cfg *agentConfig) SetConfig() (Configurable, error) {
 	agent := agent.SelfMonitor{
 		Address:        cfg.Address,
 		PollInterval:   cfg.PollInterval,
@@ -141,9 +157,11 @@ func Configure(service m.ServiceType, opts ...Option) (Configurable, error) {
 	var cfg Config
 	switch service {
 	case m.MetricsManager:
-		cfg = serverConfig{}
+		l.Info("metric manager")
+		cfg = &serverConfig{}
 	case m.SelfMonitor:
-		cfg = agentConfig{}
+		l.Info("self monitor")
+		cfg = &agentConfig{}
 	}
 
 	for _, opt := range opts {

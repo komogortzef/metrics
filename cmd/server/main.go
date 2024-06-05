@@ -1,7 +1,7 @@
 package main
 
 import (
-	c "metrics/internal/config"
+	"metrics/internal/conf"
 	l "metrics/internal/logger"
 	m "metrics/internal/models"
 
@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	server, err := c.Configure(m.MetricsManager, c.WithEnv, c.WithCmd)
+	server, err := conf.Configure(m.MetricsManager, conf.WithEnvCmd)
 	if err != nil {
 		l.Fatal("Config error", zap.Error(err))
 	}

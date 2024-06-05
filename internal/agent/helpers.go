@@ -81,9 +81,6 @@ func (sm *SelfMonitor) send(metric m.Metrics) error {
 
 func sendMetric(req *http.Request) error {
 	r, err := http.DefaultClient.Do(req)
-	if err != nil {
-		l.Warn("No connection", zap.String("err", err.Error()))
-	}
 	if r != nil && r.Body != nil {
 		r.Body.Close()
 	}

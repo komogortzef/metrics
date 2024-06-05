@@ -1,7 +1,7 @@
 package main
 
 import (
-	c "metrics/internal/config"
+	"metrics/internal/conf"
 	l "metrics/internal/logger"
 	m "metrics/internal/models"
 
@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	agent, err := c.Configure(m.SelfMonitor, c.WithEnv, c.WithCmd)
+	agent, err := conf.Configure(m.SelfMonitor, conf.WithEnvCmd)
 	if err != nil {
 		l.Fatal("agent config error", zap.Error(err))
 	}
