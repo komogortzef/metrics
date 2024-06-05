@@ -84,13 +84,11 @@ func (fs *FileStorage) StartTicker() {
 	go func() {
 		l.Info("gorutine runnning")
 		for {
-			select {
-			case <-ticker.C:
-				l.Info("time up from gorutine!")
-				if err := fs.dump(); err != nil {
-					l.Warn("Coulnd't save data to file")
-					return
-				}
+			<-ticker.C
+			l.Info("time up from gorutine!")
+			if err := fs.dump(); err != nil {
+				l.Warn("Coulnd't save data to file")
+				return
 			}
 		}
 	}()
