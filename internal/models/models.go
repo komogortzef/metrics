@@ -86,6 +86,21 @@ func NewMetric(id, mtype string, val any) (Metrics, error) {
 	return metric, nil
 }
 
+func BuildMetric(name string, val any) Metrics {
+	var metric Metrics
+	metric.ID = name
+	switch v := val.(type) {
+	case float64:
+		metric.MType = Gauge
+		metric.Value = &v
+	case int64:
+		metric.MType = Counter
+		metric.Delta = &v
+	}
+
+	return metric
+}
+
 func (met Metrics) Data() any {
 	if met.MType == Counter {
 		return *met.Delta

@@ -51,6 +51,19 @@ func (ms *MemStorage) Get(name string) ([]byte, bool) {
 	return data, ok
 }
 
+func (fs *FileStorage) Write(input []byte) (int, error) {
+	l.Info("File Store Write...")
+	len, err := fs.MemStorage.Write(input)
+
+	if fs.interval == 0 {
+		if err = fs.dump(); err != nil {
+			return len, err
+		}
+	}
+
+	return len, err
+}
+
 func (ms *MemStorage) listFromMem() [][]byte {
 	metrics := make([][]byte, ms.len)
 	i := 0
@@ -78,14 +91,11 @@ func (fs *FileStorage) dump() error {
 }
 
 func (fs *FileStorage) StartTicker() {
-	l.Info("startTicker...")
 	ticker := time.NewTicker(fs.interval * time.Second)
 
 	go func() {
-		l.Info("gorutine runnning")
 		for {
 			<-ticker.C
-			l.Info("time up from gorutine!")
 			if err := fs.dump(); err != nil {
 				l.Warn("Coulnd't save data to file")
 				return

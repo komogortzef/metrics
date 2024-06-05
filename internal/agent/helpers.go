@@ -17,35 +17,35 @@ var memStats = runtime.MemStats{}
 
 func (sm *SelfMonitor) getMetrics() {
 	sm.metrics = [m.MetricsNumber]m.Metrics{
-		buildMetric("Alloc", float64(memStats.Alloc)),
-		buildMetric("BuckHashSys", float64(memStats.BuckHashSys)),
-		buildMetric("Frees", float64(memStats.Frees)),
-		buildMetric("GCCPUFraction", memStats.GCCPUFraction),
-		buildMetric("GCSys", float64(memStats.GCSys)),
-		buildMetric("HeapAlloc", float64(memStats.HeapAlloc)),
-		buildMetric("HeapIdle", float64(memStats.HeapIdle)),
-		buildMetric("HeapInuse", float64(memStats.HeapInuse)),
-		buildMetric("HeapObjects", float64(memStats.HeapObjects)),
-		buildMetric("HeapReleased", float64(memStats.HeapReleased)),
-		buildMetric("HeapSys", float64(memStats.HeapSys)),
-		buildMetric("LastGC", float64(memStats.LastGC)),
-		buildMetric("Lookups", float64(memStats.Lookups)),
-		buildMetric("MCacheInuse", float64(memStats.MCacheInuse)),
-		buildMetric("MCacheSys", float64(memStats.MCacheSys)),
-		buildMetric("MSpanInuse", float64(memStats.MSpanInuse)),
-		buildMetric("MSpanSys", float64(memStats.MSpanSys)),
-		buildMetric("Mallocs", float64(memStats.Mallocs)),
-		buildMetric("NextGC", float64(memStats.NextGC)),
-		buildMetric("NumForcedGC", float64(memStats.NumForcedGC)),
-		buildMetric("NumGC", float64(memStats.NumGC)),
-		buildMetric("OtherSys", float64(memStats.OtherSys)),
-		buildMetric("PauseTotalNs", float64(memStats.PauseTotalNs)),
-		buildMetric("StackInuse", float64(memStats.StackInuse)),
-		buildMetric("StackSys", float64(memStats.StackSys)),
-		buildMetric("Sys", float64(memStats.Sys)),
-		buildMetric("TotalAlloc", float64(memStats.TotalAlloc)),
-		buildMetric("RandomValue", sm.randVal),
-		buildMetric("PollCount", sm.pollCount),
+		m.BuildMetric("Alloc", float64(memStats.Alloc)),
+		m.BuildMetric("BuckHashSys", float64(memStats.BuckHashSys)),
+		m.BuildMetric("Frees", float64(memStats.Frees)),
+		m.BuildMetric("GCCPUFraction", memStats.GCCPUFraction),
+		m.BuildMetric("GCSys", float64(memStats.GCSys)),
+		m.BuildMetric("HeapAlloc", float64(memStats.HeapAlloc)),
+		m.BuildMetric("HeapIdle", float64(memStats.HeapIdle)),
+		m.BuildMetric("HeapInuse", float64(memStats.HeapInuse)),
+		m.BuildMetric("HeapObjects", float64(memStats.HeapObjects)),
+		m.BuildMetric("HeapReleased", float64(memStats.HeapReleased)),
+		m.BuildMetric("HeapSys", float64(memStats.HeapSys)),
+		m.BuildMetric("LastGC", float64(memStats.LastGC)),
+		m.BuildMetric("Lookups", float64(memStats.Lookups)),
+		m.BuildMetric("MCacheInuse", float64(memStats.MCacheInuse)),
+		m.BuildMetric("MCacheSys", float64(memStats.MCacheSys)),
+		m.BuildMetric("MSpanInuse", float64(memStats.MSpanInuse)),
+		m.BuildMetric("MSpanSys", float64(memStats.MSpanSys)),
+		m.BuildMetric("Mallocs", float64(memStats.Mallocs)),
+		m.BuildMetric("NextGC", float64(memStats.NextGC)),
+		m.BuildMetric("NumForcedGC", float64(memStats.NumForcedGC)),
+		m.BuildMetric("NumGC", float64(memStats.NumGC)),
+		m.BuildMetric("OtherSys", float64(memStats.OtherSys)),
+		m.BuildMetric("PauseTotalNs", float64(memStats.PauseTotalNs)),
+		m.BuildMetric("StackInuse", float64(memStats.StackInuse)),
+		m.BuildMetric("StackSys", float64(memStats.StackSys)),
+		m.BuildMetric("Sys", float64(memStats.Sys)),
+		m.BuildMetric("TotalAlloc", float64(memStats.TotalAlloc)),
+		m.BuildMetric("RandomValue", sm.randVal),
+		m.BuildMetric("PollCount", sm.pollCount),
 	}
 }
 
@@ -85,19 +85,4 @@ func sendMetric(req *http.Request) error {
 		r.Body.Close()
 	}
 	return err
-}
-
-func buildMetric(name string, val any) m.Metrics {
-	var metric m.Metrics
-	metric.ID = name
-	switch v := val.(type) {
-	case float64:
-		metric.MType = m.Gauge
-		metric.Value = &v
-	case int64:
-		metric.MType = m.Counter
-		metric.Delta = &v
-	}
-
-	return metric
 }

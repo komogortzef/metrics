@@ -13,18 +13,19 @@ import (
 	"go.uber.org/zap"
 )
 
-type Repository interface {
-	io.Writer
-	Get(string) ([]byte, bool)
-}
+type (
+	Repository interface {
+		io.Writer
+		Get(string) ([]byte, bool)
+	}
 
-type MetricsManager struct {
-	Serv  *http.Server
-	Store Repository
-}
+	MetricsManager struct {
+		Serv  *http.Server
+		Store Repository
+	}
+)
 
 func (mm *MetricsManager) Run() error {
-
 	return mm.Serv.ListenAndServe()
 }
 
