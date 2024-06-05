@@ -4,6 +4,7 @@ import (
 	"os"
 	"sync"
 
+	l "metrics/internal/logger"
 	m "metrics/internal/models"
 
 	"github.com/tidwall/gjson"
@@ -48,7 +49,20 @@ func (ms *MemStorage) Get(name string) ([]byte, bool) {
 	return data, ok
 }
 
-func (fs *FileStorage) Dump() error {
+func (ms *MemStorage) listFromMem() [][]byte {
+	metrics := make([][]byte, ms.len)
+	i := 0
+	ms.Mtx.RLock()
+	for _, met := range ms.items {
+		metrics[i] = met
+		i++
+	}
+	ms.Mtx.RUnlock()
+	return metrics
+}
+
+func (fs *FileStorage) dump() error {
+	l.Info("Dump starts")
 	var buf []byte
 
 	fs.Mtx.RLock()

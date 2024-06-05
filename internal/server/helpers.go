@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"metrics/internal/logger"
 	l "metrics/internal/logger"
 	m "metrics/internal/models"
 
@@ -40,7 +39,7 @@ func NewFileStorage(interval int, path string, restore bool) (*FileStorage, erro
 		scanner.Split(bufio.ScanLines)
 		var len int
 		for scanner.Scan() {
-			len, err = fileStorage.MemStorage.Write(scanner.Bytes())
+			len, err = fileStorage.Write(scanner.Bytes())
 			if err != nil {
 				return nil, fmt.Errorf("write to mem from file error: %w", err)
 			}
@@ -49,8 +48,9 @@ func NewFileStorage(interval int, path string, restore bool) (*FileStorage, erro
 	}
 
 	time.AfterFunc(time.Duration(interval)*time.Second, func() {
-		if err := fileStorage.Dump(); err != nil {
-			logger.Warn("Couldn't dump data!!")
+		l.Info("timer gorutine start")
+		if err := fileStorage.dump(); err != nil {
+			l.Warn("Couldn't dump data!!")
 		}
 	})
 
@@ -61,7 +61,7 @@ func addCounter(old []byte, input []byte) ([]byte, error) {
 	var oldStruct m.Metrics
 	err := oldStruct.UnmarshalJSON(old)
 	if err != nil {
-		return nil, fmt.Errorf("Unmarshal error: %w", err)
+		return nil, fmt.Errorf("unmarshal error: %w", err)
 	}
 	numBytes := gjson.GetBytes(input, m.Delta)
 	*oldStruct.Delta += numBytes.Int()
@@ -74,22 +74,10 @@ func getList(storage Repository) [][]byte {
 
 	switch s := storage.(type) {
 	case *MemStorage:
-		return listFromMem(s)
+		return s.listFromMem()
 	case *FileStorage:
-		return listFromMem(&s.MemStorage)
+		return s.listFromMem()
 	default:
 		return nil
 	}
-}
-
-func listFromMem(ms *MemStorage) [][]byte {
-	metrics := make([][]byte, ms.len)
-	i := 0
-	ms.Mtx.RLock()
-	for _, met := range ms.items {
-		metrics[i] = met
-		i++
-	}
-	ms.Mtx.RUnlock()
-	return metrics
 }

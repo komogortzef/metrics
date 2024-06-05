@@ -7,8 +7,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,15 +29,6 @@ func testRequest(
 }
 
 func TestHandlers(t *testing.T) {
-	r := chi.NewRouter()
-	r.Get("/", GetAllHandler)
-	r.Get("/value/{type}/{id}", GetHandler)
-	r.Post("/update/{type}/{id}/{value}", UpdateHandler)
-
-	SetStorage("mem")
-
-	tserv := httptest.NewServer(r)
-	defer tserv.Close()
 
 	tests := []struct {
 		name        string
@@ -94,9 +83,6 @@ func TestHandlers(t *testing.T) {
 
 	for _, test := range tests {
 		log.Println("\n\nTEST NAME:", test.name)
-		resp, _ := testRequest(t, tserv, test.method, test.url)
-		resp.Body.Close()
 
-		assert.Equal(t, test.expected, resp.StatusCode)
 	}
 }

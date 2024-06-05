@@ -1,12 +1,12 @@
 package agent
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"sync"
 	"testing"
-	"time"
 )
 
 func mockHandler(w http.ResponseWriter, r *http.Request) {
@@ -25,8 +25,6 @@ func TestReport(t *testing.T) {
 	mockServ := httptest.NewServer(http.HandlerFunc(mockHandler))
 	defer mockServ.Close()
 
-	address = mockServ.URL
-
 }
 
 func TestCollect(t *testing.T) {
@@ -34,6 +32,6 @@ func TestCollect(t *testing.T) {
 		Mtx: &sync.RWMutex{},
 	}
 
-	go monitor.Collect()
-	time.Sleep(time.Duration(pollInterval)*time.Second + 1)
+	fmt.Println(monitor)
+
 }

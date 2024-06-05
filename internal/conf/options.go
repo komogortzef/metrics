@@ -43,8 +43,8 @@ type (
 )
 
 func WithEnvCmd(cfg Config) error {
-	var err error
-	if err = env.Parse(cfg); err != nil {
+	err := env.Parse(cfg)
+	if err != nil {
 		return fmt.Errorf("env parse error: %w", err)
 	}
 
@@ -64,14 +64,10 @@ func WithEnvCmd(cfg Config) error {
 			c.ReportInterval = *rep
 		}
 	case *serverConfig:
-		l.Info("server config in withcmdenv")
-		fmt.Println("serverConf:", c)
 		storeInterv := flag.Int("i", m.DefaultStoreInterval, "Store interval arg: -i <sec>")
 		filePath := flag.String("f", m.DefaultStorePath, "File path arg: -f </path/to/file>")
 		rest := flag.Bool("r", m.DefaultRestore, "Restore storage arg: -r <true|false")
 		flag.Parse()
-
-		fmt.Println("serverConf:", c)
 		if c.Address == "none" {
 			c.Address = *addr
 		}
@@ -84,7 +80,6 @@ func WithEnvCmd(cfg Config) error {
 		if c.Restore {
 			c.Restore = *rest
 		}
-		fmt.Println("serverConf:", c)
 	}
 
 	return err
@@ -106,20 +101,20 @@ func (cfg *serverConfig) SetConfig() (Configurable, error) {
 		Handler: router,
 	}
 
-	if cfg.FileStoragePath == "" {
-		mem := server.NewMemStorage()
-		manager.Store = &mem
-	} else {
-		fileStore, err := server.NewFileStorage(
-			cfg.StoreInterval,
-			cfg.FileStoragePath,
-			cfg.Restore,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("set storage error: %w", err)
-		}
-		manager.Store = fileStore
-	}
+	// if cfg.FileStoragePath == "" {
+	mem := server.NewMemStorage()
+	manager.Store = &mem
+	// } else {
+	// 	fileStore, err := server.NewFileStorage(
+	// 		cfg.StoreInterval,
+	// 		cfg.FileStoragePath,
+	// 		cfg.Restore,
+	// 	)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("set storage error: %w", err)
+	// 	}
+	// 	manager.Store = fileStore
+	// }
 
 	l.Info("Serv config:",
 		zap.String("addr", cfg.Address),
