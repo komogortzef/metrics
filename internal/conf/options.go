@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"os"
 	"sync"
 
 	"metrics/internal/agent"
@@ -35,8 +36,8 @@ type (
 	serverConfig struct {
 		Address         string `env:"ADDRESS" envDefault:"none"`
 		StoreInterval   int    `env:"STORE_INTERVAL" envDefault:"-1"`
-		FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"none"`
 		Restore         bool   `env:"RESTORE" envDefault:"true"`
+		FileStoragePath string
 	}
 
 	Option func(Config) error
@@ -74,9 +75,12 @@ func WithEnvCmd(cfg Config) error {
 		if c.StoreInterval < 0 {
 			c.StoreInterval = *storeInterv
 		}
-		if c.FileStoragePath == "none" {
+		if filestore, ok := os.LookupEnv("FILE_STORAGE_PATH"); !ok {
 			c.FileStoragePath = *filePath
+		} else {
+			c.FileStoragePath = filestore
 		}
+
 		if c.Restore {
 			c.Restore = *rest
 		}

@@ -30,24 +30,26 @@ func NewFileStorage(interv int, path string, restore bool) (*FileStorage, error)
 		interval:   time.Duration(interv),
 	}
 
+	var len int
 	if restore {
 		b, err := os.ReadFile(fileStorage.filePath)
 		if err != nil {
-			return nil, m.ErrRestoreFile
+			l.Warn("No file to restore!")
+			goto returnWithoutRestore
 		}
 		buff := bytes.NewBuffer(b)
 		scanner := bufio.NewScanner(buff)
 		scanner.Split(bufio.ScanLines)
-		var len int
 		for scanner.Scan() {
 			len, err = fileStorage.Write(scanner.Bytes())
 			if err != nil {
 				return nil, fmt.Errorf("write to mem from file error: %w", err)
 			}
 		}
-		l.Info("saved items number", zap.Int("items", len))
 	}
 
+returnWithoutRestore:
+	l.Info("saved items number", zap.Int("items", len))
 	return &fileStorage, nil
 }
 
