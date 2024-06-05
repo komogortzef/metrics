@@ -3,185 +3,154 @@ package config
 import (
 	"flag"
 	"fmt"
-	"os"
-	"strconv"
+	"net/http"
+	"sync"
 
+	"metrics/internal/agent"
+	c "metrics/internal/compress"
 	l "metrics/internal/logger"
 	m "metrics/internal/models"
+	"metrics/internal/server"
 
-	"github.com/caarlos0/env/v6"
+	"github.com/caarlos0/env/v11"
+	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
+)
+
+const (
+	noStrValue = "none"
+	noIntValue = "-1"
 )
 
 type (
-	Service interface {
+	Configurable interface {
 		Run() error
 	}
 
-	agentEnv struct {
-		Address        string `env:"ADDRESS"`
-		PollInterval   int    `env:"POLL_INTERVAL"`
-		ReportInterval int    `env:"REPORT_INTERVAL"`
+	Config interface {
+		SetConfig() (Configurable, error)
 	}
 
-	serverEnv struct {
-		Address         string `env:"ADDRESS"`
-		StoreInterval   int    `env:"STORE_INTERVAL"`
-		FileStoragePath string `env:"FILE_STORAGE_PATH"`
-		Restore         bool   `env:"RESTORE"`
+	agentConfig struct {
+		Address        string `env:"ADDRESS, notEmpty"`
+		PollInterval   int    `env:"POLL_INTERVAL, notEmpty"`
+		ReportInterval int    `env:"REPORT_INTERVAL, notEmpty"`
 	}
+
+	serverConfig struct {
+		Address         string `env:"ADDRESS, notEmpty"`
+		StoreInterval   int    `env:"STORE_INTERVA, notEmpty"`
+		FileStoragePath string `env:"FILE_STORAGE_PATH, notEmpty"`
+		Restore         string `env:"RESTORE, notEmpty"`
+	}
+
+	Option func(Config) error
 )
 
-func (o *options) setAddr(addr ...string) {
-	if len(addr) == 0 {
-		err := env.Parse(o)
+func WithEnv(cfg Config) error {
+
+	return nil
+}
+
+func WithEnvAndCmd(cfg Config) error {
+	addrOpt := env.Options{
+		OnSet: func(tag string, value any, isDefault bool) {
+			address := flag.String("a", m.DefaultEndpoint, "Endpoint arg: -a <HOST:PORT>")
+
+		},
+	}
+
+	switch c := cfg.(type) {
+	case agentConfig:
+		poll := flag.Int("p", m.DefaultPollInterval, "Poll Interval arg: -p <sec>")
+		report := flag.Int("r", m.DefaultReportInterval, "Report Interval arg: -r <sec>")
+		flag.Parse()
+	case serverConfig:
+		storeInterval := flag.Int("i", m.DefaultStoreInterval, "Store Interval arg: -i <sec>")
+		fStorePath := flag.String("f", m.DefaultStorePath, "File path arg: -f </path/to/file>")
+		restore := flag.Bool("r", m.DefaultRestore, "Restore option arg: -r <true|false>")
+	}
+
+	return nil
+}
+
+func (cfg serverConfig) SetConfig() (Configurable, error) {
+	var manager server.MetricsManager
+
+	router := chi.NewRouter()
+	router.Use(l.WithHandlerLog)
+	router.Get("/", c.GzipMiddleware(manager.GetAllHandler))
+	router.Post("/value/", c.GzipMiddleware(manager.GetJSON))
+	router.Get("/value/{type}/{id}", manager.GetHandler)
+	router.Post("/update/", c.GzipMiddleware(manager.UpdateJSON))
+	router.Post("/update/{type}/{id}/{value}", manager.UpdateHandler)
+
+	manager.Serv = &http.Server{
+		Addr:    cfg.Address,
+		Handler: router,
+	}
+
+	if cfg.FileStoragePath == "" {
+		mem := server.NewMemStorage()
+		manager.Store = &mem
+	} else {
+		fileStore, err := server.NewFileStorage(
+			cfg.StoreInterval,
+			cfg.FileStoragePath,
+			cfg.Restore,
+		)
 		if err != nil {
-			l.Warn("Coulnd't parse env")
+			return nil, fmt.Errorf("set storage error: %w", err)
 		}
-		if m.IsValidAddr(o.Address) {
-			o.state |= addrArg
-		}
-		return
+		manager.Store = fileStore
 	}
 
-	if o.state&addrArg == 0 {
-		if m.IsValidAddr(addr[0]) {
-			o.Address = addr[0]
-		}
-	}
+	l.Info("Serv config:",
+		zap.String("addr", cfg.Address),
+		zap.Int("store interval", cfg.StoreInterval),
+		zap.String("file stor path", cfg.FileStoragePath),
+		zap.Bool("restore", cfg.Restore),
+	)
+
+	return &manager, nil
 }
 
-var WithEnvAg = func(o *options) {
-	o.state |= seniorBitMask
-	o.setAddr()
+func (cfg agentConfig) SetConfig() (Configurable, error) {
+	agent := agent.SelfMonitor{
+		Address:        cfg.Address,
+		PollInterval:   cfg.PollInterval,
+		ReportInterval: cfg.ReportInterval,
+		SendFormat:     "json",
+		Mtx:            &sync.RWMutex{},
+	}
 
-	if o.PollInterval > 0 {
-		o.state |= pollArg
-	}
-	if o.ReportInterval > 0 {
-		o.state |= reportArg
-	}
+	l.Info("Agent config",
+		zap.String("addr", cfg.Address),
+		zap.Int("poll count", cfg.PollInterval),
+		zap.Int("report interval", cfg.ReportInterval))
+
+	return &agent, nil
 }
 
-var WithEnvSrv = func(o *options) {
-	o.setAddr()
-
-	if val, ok := os.LookupEnv("STORE_INTERVAL"); ok {
-		num, err := strconv.Atoi(val)
-		if err != nil {
-			l.Warn("Couldn't parse STORE_INTERVAL")
-		} else {
-			o.storeInterval = num
-			o.state |= storIntervArg
-		}
-	}
-
-	if val, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok {
-		if m.IsValidPath(val) {
-			o.fileStorage = val
-			o.state |= storPathArg
-		} else {
-			l.Warn("Couldn't parse FILE_STORAGE_PATH")
-		}
-	}
-
-	if val, ok := os.LookupEnv("RESTORE"); ok {
-		yesno, err := strconv.ParseBool(val)
-		if err != nil {
-			l.Warn("Couldn't parse RESTORE")
-		} else {
-			o.restore = yesno
-			o.state |= restoreArg
-		}
-	}
-}
-
-var WithCmdAg = func(o *options) {
-	if o.state == fullAgentConfig {
-		return
-	}
-	o.state |= seniorBitMask
-
-	addrFlag := flag.String(
-		"a", m.DefaultEndpoint, "Input the endpoint Address: <host:port>")
-
-	pollFlag := flag.Int(
-		"p", m.DefaultPollInterval, "Input the poll interval: <sec>")
-
-	repFlag := flag.Int(
-		"r", m.DefaultReportInterval, "Input the report interval: <sec>")
-
-	flag.Parse()
-
-	o.setAddr(*addrFlag)
-
-	if o.state&pollArg == 0 {
-		if *pollFlag > 0 {
-			o.PollInterval = *pollFlag
-		}
-	}
-	if o.state&reportArg == 0 {
-		if *repFlag > 0 {
-			o.ReportInterval = *repFlag
-		}
-	}
-}
-
-var WithCmdSrv = func(o *options) {
-	if o.state == fullServConfig {
-		return
-	}
-
-	addrFlag := flag.String(
-		"a", m.DefaultEndpoint, "Input the endpoint Address: <host:port>")
-
-	storInterFlag := flag.Int(
-		"i", m.DefaultStoreInterval, "Input the store interval: <sec>")
-
-	filePathFlag := flag.String(
-		"f", m.DefaultStorePath, "Input file storage path: </path/to/file")
-
-	restoreFlag := flag.String(
-		"r", m.DefaultRestore, "Input restore flag: <true|false")
-
-	flag.Parse()
-
-	o.setAddr(*addrFlag)
-
-	if o.state&storIntervArg == 0 {
-		o.storeInterval = *storInterFlag
-	}
-
-	if o.state&storPathArg == 0 {
-		o.fileStorage = *filePathFlag
-
-	}
-
-	if o.state&restoreArg == 0 {
-		yesno, err := strconv.ParseBool(*restoreFlag)
-		if err != nil {
-			l.Warn("Couldn't parse RESTORE")
-		} else {
-			o.restore = yesno
-		}
-	}
-}
-
-func Configure(opts ...func(*options)) (Service, error) {
+func Configure(service m.ServiceType, opts ...Option) (Configurable, error) {
 	err := l.InitLog()
 	if err != nil {
 		return nil, fmt.Errorf("init logger error: %w", err)
 	}
-	var options options
+
+	var cfg Config
+	switch service {
+	case m.MetricsManager:
+		cfg = serverConfig{}
+	case m.SelfMonitor:
+		cfg = agentConfig{}
+	}
+
 	for _, opt := range opts {
-		opt(&options)
+		if err := opt(cfg); err != nil {
+			return nil, fmt.Errorf("error while options applying: %w", err)
+		}
 	}
 
-	var service Service
-	if options.state>>7 == 1 {
-		service, err = newAgent(&options)
-	} else {
-		service, err = newServer(&options)
-	}
-
-	return service, err
+	return cfg.SetConfig()
 }

@@ -19,8 +19,8 @@ type Repository interface {
 }
 
 type MetricsManager struct {
-	Serv    *http.Server
-	Storage Repository
+	Serv  *http.Server
+	Store Repository
 }
 
 func (mm *MetricsManager) Run() error {
@@ -45,9 +45,9 @@ func (mm *MetricsManager) UpdateHandler(rw http.ResponseWriter, req *http.Reques
 		l.Warn("Marshal error", zap.Error(err))
 	}
 
-	_, err = mm.Storage.Write(bytes)
+	_, err = mm.Store.Write(bytes)
 	if err != nil {
-		l.Warn("Put to mm.Storage error", zap.Error(err))
+		l.Warn("Put to mm.Store error", zap.Error(err))
 	}
 
 	rw.WriteHeader(http.StatusOK)
@@ -58,9 +58,9 @@ func (mm *MetricsManager) GetHandler(rw http.ResponseWriter, req *http.Request) 
 	kind := chi.URLParam(req, m.Mtype)
 	name := chi.URLParam(req, m.ID)
 
-	newBytes, ok := mm.Storage.Get(name)
+	newBytes, ok := mm.Store.Get(name)
 	if !ok {
-		l.Warn("Coundn't fetch the metric from mm.Storage")
+		l.Warn("Coundn't fetch the metric from mm.Store")
 		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
 		return
 	}
@@ -82,7 +82,7 @@ func (mm *MetricsManager) GetAllHandler(rw http.ResponseWriter, req *http.Reques
 	list := make([]Item, 0, m.MetricsNumber)
 
 	var metric m.Metrics
-	for _, bytes := range getList(mm.Storage) {
+	for _, bytes := range getList(mm.Store) {
 		_ = metric.UnmarshalJSON(bytes)
 		list = append(list, Item{Met: metric.String()})
 	}
@@ -113,16 +113,16 @@ func (mm *MetricsManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) 
 		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
 		return
 	}
-	if _, err = mm.Storage.Write(bytes); err != nil {
-		l.Warn("Coudn't save data to mm.Storage")
+	if _, err = mm.Store.Write(bytes); err != nil {
+		l.Warn("Coudn't save data to mm.Store")
 	}
 	newBytes := bytes
 	if mtype == m.Counter {
 		name := gjson.GetBytes(bytes, m.Delta).String()
 		var ok bool
-		newBytes, ok = mm.Storage.Get(name)
+		newBytes, ok = mm.Store.Get(name)
 		if !ok {
-			l.Warn("Coulnd't fetch the metric from mm.Storage")
+			l.Warn("Coulnd't fetch the metric from mm.Store")
 		}
 	}
 
@@ -146,7 +146,7 @@ func (mm *MetricsManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	name := gjson.GetBytes(bytes, m.ID).String()
-	newBytes, ok := mm.Storage.Get(name)
+	newBytes, ok := mm.Store.Get(name)
 	if !ok {
 		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
 		return

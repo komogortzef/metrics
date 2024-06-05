@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
+	"metrics/internal/logger"
 	l "metrics/internal/logger"
 	m "metrics/internal/models"
 
@@ -24,15 +26,14 @@ func NewMemStorage() MemStorage {
 func NewFileStorage(interval int, path string, restore bool) (*FileStorage, error) {
 	l.Debug("New file storage ...")
 	fileStorage := FileStorage{
-		MemStorage:    NewMemStorage(),
-		filePath:      path,
-		storeInterval: interval,
+		MemStorage: NewMemStorage(),
+		filePath:   path,
 	}
 
 	if restore {
 		b, err := os.ReadFile(fileStorage.filePath)
 		if err != nil {
-			return &fileStorage, m.ErrRestoreFile
+			return nil, m.ErrRestoreFile
 		}
 		buff := bytes.NewBuffer(b)
 		scanner := bufio.NewScanner(buff)
@@ -41,11 +42,18 @@ func NewFileStorage(interval int, path string, restore bool) (*FileStorage, erro
 		for scanner.Scan() {
 			len, err = fileStorage.MemStorage.Write(scanner.Bytes())
 			if err != nil {
-				return &fileStorage, fmt.Errorf("write to mem error: %w", err)
+				return nil, fmt.Errorf("write to mem from file error: %w", err)
 			}
 		}
 		l.Info("saved items number", zap.Int("items", len))
 	}
+
+	time.AfterFunc(time.Duration(interval)*time.Second, func() {
+		if err := fileStorage.Dump(); err != nil {
+			logger.Warn("Couldn't dump data!!")
+		}
+	})
+
 	return &fileStorage, nil
 }
 

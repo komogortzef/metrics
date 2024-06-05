@@ -16,6 +16,13 @@ type Metrics struct {
 	Value *float64 `json:"value,omitempty"`
 }
 
+type ServiceType uint8
+
+const (
+	MetricsManager ServiceType = iota
+	SelfMonitor
+)
+
 const (
 	MetricsNumber = 29
 
@@ -24,7 +31,7 @@ const (
 	DefaultReportInterval = 10
 	DefaultStoreInterval  = 300
 	DefaultStorePath      = "/tmp/metrics-db.json"
-	DefaultRestore        = "true"
+	DefaultRestore        = true
 	DefaultSendMode       = "text"
 
 	InternalErrorMsg  = "internal server error"
@@ -43,6 +50,7 @@ var (
 	ErrNoVal       = errors.New("metric without val")
 	ErrInvalidType = errors.New("invalid type")
 	ErrRestoreFile = errors.New("no file to restore")
+	ErrEnvConfig   = errors.New("error env config")
 
 	IsValidAddr = regexp.MustCompile(`^(.*):(\d+)$`).MatchString
 	IsValidPath = regexp.MustCompile(`^(/[^/\0]+)+/?$`).MatchString

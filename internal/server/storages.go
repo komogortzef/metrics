@@ -3,7 +3,6 @@ package server
 import (
 	"os"
 	"sync"
-	"time"
 
 	m "metrics/internal/models"
 
@@ -19,9 +18,7 @@ type (
 
 	FileStorage struct {
 		MemStorage
-		filePath      string
-		storeInterval int
-		Timer         *time.Timer
+		filePath string
 	}
 )
 

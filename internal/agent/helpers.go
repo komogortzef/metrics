@@ -94,12 +94,12 @@ func buildMetric(name string, val any) m.Metrics {
 	var metric m.Metrics
 	metric.ID = name
 	switch v := val.(type) {
-	case int64:
-		metric.MType = m.Counter
-		metric.Delta = &v
 	case float64:
 		metric.MType = m.Gauge
 		metric.Value = &v
+	case int64:
+		metric.MType = m.Counter
+		metric.Delta = &v
 	}
 
 	return metric
