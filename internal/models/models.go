@@ -15,13 +15,6 @@ type Metrics struct {
 	Value *float64 `json:"value,omitempty"`
 }
 
-type ServiceType uint8
-
-const (
-	MetricsManager ServiceType = iota
-	SelfMonitor
-)
-
 const (
 	MetricsNumber = 29
 

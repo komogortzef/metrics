@@ -3,13 +3,12 @@ package main
 import (
 	"metrics/internal/conf"
 	l "metrics/internal/logger"
-	m "metrics/internal/models"
 
 	"go.uber.org/zap"
 )
 
 func main() {
-	server, err := conf.Configure(m.MetricsManager, conf.WithEnvCmd)
+	server, err := conf.Configure(conf.MetricsManager, conf.WithEnvCmd)
 	if err != nil {
 		l.Fatal("Config error", zap.Error(err))
 	}

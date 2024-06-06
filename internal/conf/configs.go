@@ -8,7 +8,6 @@ import (
 	"metrics/internal/agent"
 	c "metrics/internal/compress"
 	l "metrics/internal/logger"
-	m "metrics/internal/models"
 	"metrics/internal/server"
 
 	"github.com/go-chi/chi/v5"
@@ -20,8 +19,8 @@ type (
 		Run() error
 	}
 
-	Config interface {
-		SetConfig() (Configurable, error)
+	config interface {
+		setConfig() (Configurable, error)
 	}
 
 	agentConfig struct {
@@ -37,10 +36,17 @@ type (
 		FileStoragePath string
 	}
 
-	Option func(Config) error
+	Option func(config) error
+
+	ServiceType uint8
 )
 
-func (cfg *serverConfig) SetConfig() (Configurable, error) {
+const (
+	MetricsManager ServiceType = iota
+	SelfMonitor
+)
+
+func (cfg *serverConfig) setConfig() (Configurable, error) {
 	var manager server.MetricsManager
 
 	router := chi.NewRouter()
@@ -85,7 +91,7 @@ func (cfg *serverConfig) SetConfig() (Configurable, error) {
 	return &manager, nil
 }
 
-func (cfg *agentConfig) SetConfig() (Configurable, error) {
+func (cfg *agentConfig) setConfig() (Configurable, error) {
 	agent := agent.SelfMonitor{
 		Address:        cfg.Address,
 		PollInterval:   cfg.PollInterval,
@@ -102,18 +108,18 @@ func (cfg *agentConfig) SetConfig() (Configurable, error) {
 	return &agent, nil
 }
 
-func Configure(service m.ServiceType, opts ...Option) (Configurable, error) {
+func Configure(service ServiceType, opts ...Option) (Configurable, error) {
 	err := l.InitLog()
 	if err != nil {
 		return nil, fmt.Errorf("init logger error: %w", err)
 	}
 
-	var cfg Config
+	var cfg config
 	switch service {
-	case m.MetricsManager:
+	case MetricsManager:
 		l.Info("metric manager")
 		cfg = &serverConfig{}
-	case m.SelfMonitor:
+	case SelfMonitor:
 		l.Info("self monitor")
 		cfg = &agentConfig{}
 	}
@@ -124,5 +130,5 @@ func Configure(service m.ServiceType, opts ...Option) (Configurable, error) {
 		}
 	}
 
-	return cfg.SetConfig()
+	return cfg.setConfig()
 }

@@ -49,7 +49,7 @@ func NewFileStorage(interv int, path string, restore bool) (*FileStorage, error)
 	}
 
 returnWithoutRestore:
-	l.Info("saved items number", zap.Int("items", len))
+	l.Info("saved from file", zap.Int("items", len))
 	return &fileStorage, nil
 }
 

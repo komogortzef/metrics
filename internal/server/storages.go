@@ -52,7 +52,6 @@ func (ms *MemStorage) Get(name string) ([]byte, bool) {
 }
 
 func (fs *FileStorage) Write(input []byte) (int, error) {
-	l.Info("File Store Write...")
 	len, err := fs.MemStorage.Write(input)
 
 	if fs.interval == 0 {

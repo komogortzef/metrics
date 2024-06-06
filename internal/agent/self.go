@@ -23,7 +23,7 @@ type SelfMonitor struct {
 	Mtx            *sync.RWMutex
 }
 
-func (sm *SelfMonitor) Collect() {
+func (sm *SelfMonitor) collect() {
 	for {
 		sm.Mtx.Lock()
 		runtime.ReadMemStats(&memStats)
@@ -36,7 +36,7 @@ func (sm *SelfMonitor) Collect() {
 	}
 }
 
-func (sm *SelfMonitor) Report() {
+func (sm *SelfMonitor) report() {
 	var err error
 	for {
 	sleep:
@@ -58,8 +58,8 @@ func (sm *SelfMonitor) Report() {
 }
 
 func (sm *SelfMonitor) Run() error {
-	go sm.Collect()
-	sm.Report()
+	go sm.collect()
+	sm.report()
 
 	return nil
 }
