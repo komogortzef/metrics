@@ -12,7 +12,7 @@ import (
 
 func TestWrite(t *testing.T) {
 	mem := MemStorage{
-		items: make(map[string][]byte, m.MetricsNumber),
+		Items: make(map[string][]byte, m.MetricsNumber),
 		Mtx:   &sync.RWMutex{},
 	}
 
@@ -47,7 +47,7 @@ func TestWrite(t *testing.T) {
 
 	for _, test := range tests {
 		log.Println("\n\nTEST:", test.name)
-		_, err := mem.Write(test.arg)
+		_, err := mem.Put("some", test.arg)
 		assert.Equal(t, err, test.err)
 	}
 }

@@ -15,8 +15,8 @@ func WithEnvCmd(cfg config) error {
 	if err != nil {
 		return fmt.Errorf("env parse error: %w", err)
 	}
-	addr := flag.String("a", m.DefaultEndpoint, "Endpoint arg: -a <host:port>")
 
+	addr := flag.String("a", m.DefaultEndpoint, "Endpoint arg: -a <host:port>")
 	switch c := cfg.(type) {
 	case *agentConfig:
 		poll := flag.Int("p", m.DefaultPollInterval, "Poll Interval arg: -p <sec>")
@@ -35,6 +35,7 @@ func WithEnvCmd(cfg config) error {
 		storeInterv := flag.Int("i", m.DefaultStoreInterval, "Store interval arg: -i <sec>")
 		filePath := flag.String("f", m.DefaultStorePath, "File path arg: -f </path/to/file>")
 		rest := flag.Bool("r", m.DefaultRestore, "Restore storage arg: -r <true|false>")
+		dbAddr := flag.String("d", "", "DB address arg: -d <database://username:password@host:port/db_name>")
 		flag.Parse()
 		if c.Address == "none" {
 			c.Address = *addr
@@ -50,6 +51,9 @@ func WithEnvCmd(cfg config) error {
 
 		if c.Restore {
 			c.Restore = *rest
+		}
+		if c.dbAddress == "none" {
+			c.dbAddress = *dbAddr
 		}
 	}
 

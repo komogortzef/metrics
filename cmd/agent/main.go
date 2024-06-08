@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	agent, err := conf.Configure(conf.SelfMonitor, conf.WithEnvCmd)
+	agent, err := conf.Configure(conf.MetricAgent, conf.WithEnvCmd)
 	if err != nil {
 		l.Fatal("agent config error", zap.Error(err))
 	}

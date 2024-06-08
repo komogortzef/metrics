@@ -1,22 +1,29 @@
 package server
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	l "metrics/internal/logger"
 	m "metrics/internal/models"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
 
 type (
+	helper func([]byte, []byte) ([]byte, error)
+
 	Repository interface {
-		io.Writer
-		Get(string) ([]byte, bool)
+		Put(key string, data []byte, helps ...helper) (int, error)
+		Get(key string) ([]byte, bool)
+		Delete(key string) error
 	}
 
 	MetricsManager struct {
@@ -26,47 +33,65 @@ type (
 )
 
 func (mm *MetricsManager) Run() error {
+	switch s := mm.Store.(type) {
+	case *DataBase:
+		var err error
+		if s.Pool, err = pgxpool.New(context.TODO(), s.Addr); err != nil {
+			return fmt.Errorf("db connection error: %w", err)
+		}
+	case *FileStorage:
+		if s.Restore {
+			s.restoreFromFile()
+		}
+		s.startTicker()
+	}
 	return mm.Serv.ListenAndServe()
 }
 
 func (mm *MetricsManager) UpdateHandler(rw http.ResponseWriter, req *http.Request) {
-	l.Debug("UPDATE HANDLER starts ...")
-	metric, err := m.NewMetric(
-		chi.URLParam(req, m.ID),
-		chi.URLParam(req, m.Mtype),
-		chi.URLParam(req, m.Value),
-	)
+	mtype := chi.URLParam(req, m.Mtype)
+	name := chi.URLParam(req, m.ID)
+	value := chi.URLParam(req, m.Value)
+
+	metric, err := m.NewMetric(name, mtype, value)
 	if err != nil {
-		l.Warn("Invalid metric value or type")
+		l.Warn("UpdateHandler(): Invalid metric value or type")
 		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
 		return
 	}
 	bytes, err := metric.MarshalJSON()
 	if err != nil {
-		l.Warn("Marshal error", zap.Error(err))
+		l.Warn("UpdateHandler(): marshal error", zap.Error(err))
+		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
+		return
 	}
 
-	_, err = mm.Store.Write(bytes)
+	if mtype == m.Counter {
+		_, err = mm.Store.Put(name, bytes, addCounter)
+	} else {
+		_, err = mm.Store.Put(name, bytes)
+	}
 	if err != nil {
-		l.Warn("Put to mm.Store error", zap.Error(err))
+		l.Warn("UpdateHandler(): storage error", zap.Error(err))
+		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
+		return
 	}
 
 	rw.WriteHeader(http.StatusOK)
 }
 
 func (mm *MetricsManager) GetHandler(rw http.ResponseWriter, req *http.Request) {
-	l.Debug("GET HANDLER starts ...")
-	kind := chi.URLParam(req, m.Mtype)
+	mtype := chi.URLParam(req, m.Mtype)
 	name := chi.URLParam(req, m.ID)
 
 	newBytes, ok := mm.Store.Get(name)
 	if !ok {
-		l.Warn("Coundn't fetch the metric from mm.Store")
+		l.Warn("GetHandler(): Coundn't fetch the metric from store")
 		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
 		return
 	}
 	var numStr string
-	if kind == m.Counter {
+	if mtype == m.Counter {
 		numBytes := gjson.GetBytes(newBytes, m.Delta)
 		numStr = strconv.FormatInt(numBytes.Int(), 10)
 	} else {
@@ -79,7 +104,6 @@ func (mm *MetricsManager) GetHandler(rw http.ResponseWriter, req *http.Request) 
 }
 
 func (mm *MetricsManager) GetAllHandler(rw http.ResponseWriter, req *http.Request) {
-	l.Debug("GET ALL HANDLER starts ...")
 	list := make([]Item, 0, m.MetricsNumber)
 
 	var metric m.Metrics
@@ -90,7 +114,7 @@ func (mm *MetricsManager) GetAllHandler(rw http.ResponseWriter, req *http.Reques
 
 	html, err := renderGetAll(list)
 	if err != nil {
-		l.Warn("An error occured during html rendering")
+		l.Warn("GetAllHandler(): An error occured during html rendering")
 		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
 		return
 	}
@@ -101,30 +125,30 @@ func (mm *MetricsManager) GetAllHandler(rw http.ResponseWriter, req *http.Reques
 }
 
 func (mm *MetricsManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) {
-	l.Info("UpdateJSON starts...")
 	bytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		l.Warn("Couldn't read with decompress")
 	}
 	defer req.Body.Close()
 
+	name := gjson.GetBytes(bytes, m.ID).String()
 	mtype := gjson.GetBytes(bytes, m.Mtype).String()
-	if mtype != m.Counter && mtype != m.Gauge {
-		l.Info("Invalid metric type")
-		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
+
+	if mtype == m.Counter {
+		_, err = mm.Store.Put(name, bytes, addCounter)
+	} else {
+		_, err = mm.Store.Put(name, bytes)
+	}
+	if err != nil {
+		l.Warn("UpdateJSON(): couldn't write to store", zap.Error(err))
+		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
 		return
 	}
-	if _, err = mm.Store.Write(bytes); err != nil {
-		l.Warn("Coudn't save data to mm.Store")
-	}
+
 	newBytes := bytes
 	if mtype == m.Counter {
 		name := gjson.GetBytes(bytes, m.Delta).String()
-		var ok bool
-		newBytes, ok = mm.Store.Get(name)
-		if !ok {
-			l.Warn("Coulnd't fetch the metric from mm.Store")
-		}
+		newBytes, _ = mm.Store.Get(name)
 	}
 
 	rw.WriteHeader(http.StatusOK)
@@ -132,28 +156,49 @@ func (mm *MetricsManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) 
 }
 
 func (mm *MetricsManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
-	l.Info("GetJSON starts...")
 	bytes, err := io.ReadAll(req.Body)
 	if err != nil {
-		l.Warn("Couldn't read with decompress")
+		l.Warn("GetJSON(): Couldn't read request body")
+		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
+		return
 	}
 	defer req.Body.Close()
 
 	mtype := gjson.GetBytes(bytes, m.Mtype).String()
 	if mtype != m.Counter && mtype != m.Gauge {
-		l.Info("Invalid metric type")
+		l.Info("GetJSON(): Invalid metric type")
 		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
 		return
 	}
 
 	name := gjson.GetBytes(bytes, m.ID).String()
-	newBytes, ok := mm.Store.Get(name)
+	bytes, ok := mm.Store.Get(name)
 	if !ok {
+		l.Warn("GetJSON(): No such metric in store")
 		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
 		return
 	}
 
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusOK)
-	_, _ = rw.Write(newBytes)
+	_, _ = rw.Write(bytes)
+}
+
+func (mm *MetricsManager) PingHandler(rw http.ResponseWriter, req *http.Request) {
+	db, ok := mm.Store.(*DataBase)
+	if !ok {
+		l.Warn("PingHandler(): Invalid storage type for ping")
+		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := db.Ping(ctx); err != nil {
+		l.Warn("PingHandler(): There is no connection to data base")
+		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
+		return
+	}
+	rw.WriteHeader(http.StatusOK)
 }

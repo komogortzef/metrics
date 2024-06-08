@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	server, err := conf.Configure(conf.MetricsManager, conf.WithEnvCmd)
+	server, err := conf.Configure(conf.MetricServer, conf.WithEnvCmd)
 	if err != nil {
 		l.Fatal("Config error", zap.Error(err))
 	}

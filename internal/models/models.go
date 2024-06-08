@@ -39,10 +39,8 @@ const (
 )
 
 var (
-	ErrNoVal       = errors.New("metric without val")
-	ErrInvalidType = errors.New("invalid type")
-	ErrRestoreFile = errors.New("no file to restore")
-	ErrEnvConfig   = errors.New("error env config")
+	ErrInvalidVal  = errors.New("invalid metric value")
+	ErrInvalidType = errors.New("invalid metric type")
 
 	IsValidAddr = regexp.MustCompile(`^(.*):(\d+)$`).MatchString
 	IsValidPath = regexp.MustCompile(`^(/[^/\0]+)+/?$`).MatchString
@@ -64,13 +62,13 @@ func NewMetric(id, mtype string, val any) (Metrics, error) {
 		if mtype == Counter {
 			num, err := strconv.ParseInt(v, 10, 64)
 			if err != nil {
-				return metric, ErrNoVal
+				return metric, ErrInvalidVal
 			}
 			metric.Delta = &num
 		} else {
 			num, err := strconv.ParseFloat(v, 64)
 			if err != nil {
-				return metric, ErrNoVal
+				return metric, ErrInvalidVal
 			}
 			metric.Value = &num
 		}
@@ -94,14 +92,14 @@ func BuildMetric(name string, val any) Metrics {
 	return metric
 }
 
-func (met Metrics) Data() any {
+func (met *Metrics) Data() any {
 	if met.MType == Counter {
 		return *met.Delta
 	}
 	return *met.Value
 }
 
-func (met Metrics) String() string {
+func (met *Metrics) String() string {
 	if met.Delta == nil && met.Value == nil {
 		return fmt.Sprintf(" %s: <empty>", met.ID)
 	}

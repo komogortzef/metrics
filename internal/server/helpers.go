@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"sync"
-	"time"
 
 	l "metrics/internal/logger"
 	m "metrics/internal/models"
@@ -15,65 +13,42 @@ import (
 	"go.uber.org/zap"
 )
 
-func NewMemStorage() MemStorage {
-	return MemStorage{
-		items: make(map[string][]byte, m.MetricsNumber),
-		Mtx:   &sync.RWMutex{},
+func (fs *FileStorage) restoreFromFile() (len int) {
+	b, err := os.ReadFile(fs.FilePath)
+	if err != nil {
+		l.Warn("No file to restore!")
+		return
 	}
-}
-
-func NewFileStorage(interv int, path string, restore bool) (*FileStorage, error) {
-	l.Debug("New file storage ...")
-	fileStorage := FileStorage{
-		MemStorage: NewMemStorage(),
-		filePath:   path,
-		interval:   time.Duration(interv),
+	buff := bytes.NewBuffer(b)
+	scanner := bufio.NewScanner(buff)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		bytes := scanner.Bytes()
+		name := gjson.GetBytes(bytes, m.ID).String()
+		len, _ = fs.Put(name, bytes)
 	}
+	l.Info("number of metrics recovered from the file", zap.Int("len", len))
+	return
 
-	var len int
-	if restore {
-		b, err := os.ReadFile(fileStorage.filePath)
-		if err != nil {
-			l.Warn("No file to restore!")
-			goto returnWithoutRestore
-		}
-		buff := bytes.NewBuffer(b)
-		scanner := bufio.NewScanner(buff)
-		scanner.Split(bufio.ScanLines)
-		for scanner.Scan() {
-			len, err = fileStorage.Write(scanner.Bytes())
-			if err != nil {
-				return nil, fmt.Errorf("write to mem from file error: %w", err)
-			}
-		}
-	}
-
-returnWithoutRestore:
-	l.Info("saved from file", zap.Int("items", len))
-	return &fileStorage, nil
 }
 
 func addCounter(old []byte, input []byte) ([]byte, error) {
 	var oldStruct m.Metrics
-	err := oldStruct.UnmarshalJSON(old)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshal error: %w", err)
+	if err := oldStruct.UnmarshalJSON(old); err != nil {
+		return nil, fmt.Errorf("addCounter(): unmarshal error: %w", err)
 	}
-	numBytes := gjson.GetBytes(input, m.Delta)
-	*oldStruct.Delta += numBytes.Int()
+	num := gjson.GetBytes(input, m.Delta).Int()
+	*oldStruct.Delta += num
 
 	return oldStruct.MarshalJSON()
 }
 
 func getList(storage Repository) [][]byte {
-	l.Info("Get list...")
-
 	switch s := storage.(type) {
 	case *MemStorage:
 		return s.listFromMem()
 	case *FileStorage:
 		return s.listFromMem()
-	default:
-		return nil
 	}
+	return nil
 }

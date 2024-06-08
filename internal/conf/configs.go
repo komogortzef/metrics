@@ -34,16 +34,16 @@ type (
 		StoreInterval   int    `env:"STORE_INTERVAL" envDefault:"-1"`
 		Restore         bool   `env:"RESTORE" envDefault:"true"`
 		FileStoragePath string
+		dbAddress       string `env:"DATABASE_DSN" envDefault:"none"`
 	}
 
-	Option func(config) error
-
 	ServiceType uint8
+	Option      func(config) error
 )
 
 const (
-	MetricsManager ServiceType = iota
-	SelfMonitor
+	MetricServer ServiceType = iota
+	MetricAgent
 )
 
 func (cfg *serverConfig) setConfig() (Configurable, error) {
@@ -52,6 +52,7 @@ func (cfg *serverConfig) setConfig() (Configurable, error) {
 	router := chi.NewRouter()
 	router.Use(l.WithHandlerLog)
 	router.Get("/", c.GzipMiddleware(manager.GetAllHandler))
+	router.Get("/pint", manager.PingHandler)
 	router.Post("/value/", c.GzipMiddleware(manager.GetJSON))
 	router.Get("/value/{type}/{id}", manager.GetHandler)
 	router.Post("/update/", c.GzipMiddleware(manager.UpdateJSON))
@@ -62,24 +63,7 @@ func (cfg *serverConfig) setConfig() (Configurable, error) {
 		Handler: router,
 	}
 
-	if cfg.FileStoragePath == "" {
-		mem := server.NewMemStorage()
-		manager.Store = &mem
-	} else {
-		fileStore, err := server.NewFileStorage(
-			cfg.StoreInterval,
-			cfg.FileStoragePath,
-			cfg.Restore,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("set storage error: %w", err)
-		}
-		manager.Store = fileStore
-
-		if cfg.StoreInterval > 0 {
-			fileStore.StartTicker()
-		}
-	}
+	cfg.setStorage(&manager)
 
 	l.Info("Serv config:",
 		zap.String("addr", cfg.Address),
@@ -116,11 +100,9 @@ func Configure(service ServiceType, opts ...Option) (Configurable, error) {
 
 	var cfg config
 	switch service {
-	case MetricsManager:
-		l.Info("metric manager")
+	case MetricServer:
 		cfg = &serverConfig{}
-	case SelfMonitor:
-		l.Info("self monitor")
+	case MetricAgent:
 		cfg = &agentConfig{}
 	}
 
@@ -130,5 +112,15 @@ func Configure(service ServiceType, opts ...Option) (Configurable, error) {
 		}
 	}
 
+	l.Info(service.String())
 	return cfg.setConfig()
+}
+
+func (service ServiceType) String() string {
+	switch service {
+	case MetricServer:
+		return "Metric Server"
+	default:
+		return "Metric Agent"
+	}
 }
