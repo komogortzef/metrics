@@ -6,11 +6,16 @@ import (
 
 	m "metrics/internal/models"
 	"metrics/internal/server"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func (cfg *serverConfig) setStorage(manager *server.MetricsManager) {
 	if cfg.DBAddress != "" {
-		manager.Store, _ = server.NewDataBase(cfg.DBAddress)
+		manager.Store = &server.DataBase{
+			Pool: &pgxpool.Pool{},
+			Addr: cfg.DBAddress,
+		}
 	} else if cfg.FileStoragePath != "" {
 		manager.Store = &server.FileStorage{
 			MemStorage: server.MemStorage{

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	m "metrics/internal/models"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
@@ -32,12 +34,25 @@ type (
 
 func (mm *MetricsManager) Run() error {
 	switch s := mm.Store.(type) {
+	case *DataBase:
+		config, err := pgxpool.ParseConfig(s.Addr)
+		if err != nil {
+			return fmt.Errorf("unable to parse connection string: %w", err)
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if s.Pool, err = pgxpool.NewWithConfig(ctx, config); err != nil {
+			return fmt.Errorf("unable to create connection pool: %w", err)
+		}
 	case *FileStorage:
 		if s.Restore {
 			s.restoreFromFile()
 		}
 		s.startTicker()
 	}
+
 	return mm.Serv.ListenAndServe()
 }
 
