@@ -34,7 +34,7 @@ type (
 		StoreInterval   int    `env:"STORE_INTERVAL" envDefault:"-1"`
 		Restore         bool   `env:"RESTORE" envDefault:"true"`
 		FileStoragePath string
-		dbAddress       string `env:"DATABASE_DSN" envDefault:"none"`
+		DBAddress       string `env:"DATABASE_DSN" envDefault:"none"`
 	}
 
 	ServiceType uint8
@@ -52,7 +52,7 @@ func (cfg *serverConfig) setConfig() (Configurable, error) {
 	router := chi.NewRouter()
 	router.Use(l.WithHandlerLog)
 	router.Get("/", c.GzipMiddleware(manager.GetAllHandler))
-	router.Get("/pint", manager.PingHandler)
+	router.Get("/ping", manager.PingHandler)
 	router.Post("/value/", c.GzipMiddleware(manager.GetJSON))
 	router.Get("/value/{type}/{id}", manager.GetHandler)
 	router.Post("/update/", c.GzipMiddleware(manager.UpdateJSON))
@@ -70,6 +70,7 @@ func (cfg *serverConfig) setConfig() (Configurable, error) {
 		zap.Int("store interval", cfg.StoreInterval),
 		zap.String("file stor path", cfg.FileStoragePath),
 		zap.Bool("restore", cfg.Restore),
+		zap.String("DB", cfg.DBAddress),
 	)
 
 	return &manager, nil
