@@ -15,6 +15,8 @@ import (
 
 var memStats = runtime.MemStats{}
 
+// формирование метрик и сбор в массив,
+// присваивание массива переменной структуры
 func (sm *SelfMonitor) getMetrics() {
 	sm.metrics = [m.MetricsNumber]m.Metrics{
 		m.BuildMetric("Alloc", float64(memStats.Alloc)),
@@ -49,6 +51,7 @@ func (sm *SelfMonitor) getMetrics() {
 	}
 }
 
+// отправка метрик в соотвествующем формате
 func (sm *SelfMonitor) send(metric m.Metrics) error {
 	baseurl := "http://" + sm.Address + "/update/"
 	switch sm.SendFormat {

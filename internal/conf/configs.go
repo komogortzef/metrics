@@ -93,6 +93,8 @@ func (cfg *agentConfig) setConfig() (Configurable, error) {
 	return &agent, nil
 }
 
+// установка параметров конфига в зависимости от типа конфигурируемого объекта
+// и инициализация логера
 func Configure(service ServiceType, opts ...Option) (Configurable, error) {
 	err := l.InitLog()
 	if err != nil {
@@ -107,6 +109,7 @@ func Configure(service ServiceType, opts ...Option) (Configurable, error) {
 		cfg = &agentConfig{}
 	}
 
+	// установка зн-ий для полей структуры представляющей конфигурацию
 	for _, opt := range opts {
 		if err := opt(cfg); err != nil {
 			return nil, fmt.Errorf("error while options applying: %w", err)

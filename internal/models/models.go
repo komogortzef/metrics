@@ -3,7 +3,6 @@ package models
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strconv"
 )
 
@@ -15,6 +14,7 @@ type Metrics struct {
 	Value *float64 `json:"value,omitempty"`
 }
 
+// часто используемые строковые литералы в виде констант
 const (
 	MetricsNumber = 29
 
@@ -41,11 +41,9 @@ const (
 var (
 	ErrInvalidVal  = errors.New("invalid metric value")
 	ErrInvalidType = errors.New("invalid metric type")
-
-	IsValidAddr = regexp.MustCompile(`^(.*):(\d+)$`).MatchString
-	IsValidPath = regexp.MustCompile(`^(/[^/\0]+)+/?$`).MatchString
 )
 
+// сборка метрики для сервера
 func NewMetric(id, mtype string, val any) (Metrics, error) {
 	var metric Metrics
 	if mtype != Counter && mtype != Gauge {
@@ -77,6 +75,7 @@ func NewMetric(id, mtype string, val any) (Metrics, error) {
 	return metric, nil
 }
 
+// сборка метрики для агента
 func BuildMetric(name string, val any) Metrics {
 	var metric Metrics
 	metric.ID = name

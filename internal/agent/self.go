@@ -61,5 +61,5 @@ func (sm *SelfMonitor) Run() error {
 	go sm.collect()
 	sm.report()
 
-	return nil
+	return nil // чтобы удовлетворить Configurable
 }

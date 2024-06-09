@@ -18,12 +18,12 @@ import (
 )
 
 type (
-	helper func([]byte, []byte) ([]byte, error)
+	helper func([]byte, []byte) ([]byte, error) // для доп операций перед сохраненим в Store
 
 	Repository interface {
-		Put(key string, data []byte, helps ...helper) (int, error)
+		Put(key string, data []byte, helpers ...helper) (int, error)
 		Get(key string) ([]byte, bool)
-		Delete(key string) error
+		Pop(key string) ([]byte, error)
 	}
 
 	MetricsManager struct {
@@ -32,6 +32,7 @@ type (
 	}
 )
 
+// инициализация хранилища и запуск
 func (mm *MetricsManager) Run() error {
 	switch s := mm.Store.(type) {
 	case *DataBase:
@@ -40,7 +41,7 @@ func (mm *MetricsManager) Run() error {
 			return fmt.Errorf("unable to parse connection string: %w", err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
 		if s.Pool, err = pgxpool.NewWithConfig(ctx, config); err != nil {
@@ -98,6 +99,7 @@ func (mm *MetricsManager) GetHandler(rw http.ResponseWriter, req *http.Request) 
 		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
 		return
 	}
+	// получение значений полей Delta или Value
 	var numStr string
 	if mtype == m.Counter {
 		numBytes := gjson.GetBytes(newBytes, m.Delta)
@@ -172,13 +174,6 @@ func (mm *MetricsManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 	}
 	defer req.Body.Close()
 
-	mtype := gjson.GetBytes(bytes, m.Mtype).String()
-	if mtype != m.Counter && mtype != m.Gauge {
-		l.Info("GetJSON(): Invalid metric type")
-		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
-		return
-	}
-
 	name := gjson.GetBytes(bytes, m.ID).String()
 	bytes, ok := mm.Store.Get(name)
 	if !ok {
@@ -200,7 +195,7 @@ func (mm *MetricsManager) PingHandler(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := db.Ping(ctx); err != nil {
@@ -209,4 +204,5 @@ func (mm *MetricsManager) PingHandler(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 	rw.WriteHeader(http.StatusOK)
+	rw.Write([]byte("The connection is established!"))
 }

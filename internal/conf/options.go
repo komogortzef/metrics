@@ -10,12 +10,13 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
+// заполнение значений полей структуры конфигурации переменными окружения,
+// или аргументами командной строки, или значениями по умолчанию
 func WithEnvCmd(cfg config) error {
 	err := env.Parse(cfg)
 	if err != nil {
 		return fmt.Errorf("env parse error: %w", err)
 	}
-
 	addr := flag.String("a", m.DefaultEndpoint, "Endpoint arg: -a <host:port>")
 	switch c := cfg.(type) {
 	case *agentConfig:
@@ -48,7 +49,6 @@ func WithEnvCmd(cfg config) error {
 		} else {
 			c.FileStoragePath = filestore
 		}
-
 		if c.Restore {
 			c.Restore = *rest
 		}

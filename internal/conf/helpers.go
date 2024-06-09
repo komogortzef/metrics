@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// установка хранилища для сервера в зависимости от значений полей конфигурации
 func (cfg *serverConfig) setStorage(manager *server.MetricsManager) {
 	if cfg.DBAddress != "" {
 		manager.Store = &server.DataBase{
