@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	l "metrics/internal/logger"
+	log "metrics/internal/logger"
 	m "metrics/internal/models"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -26,7 +26,6 @@ type (
 		MemStorage
 		FilePath string
 		Interval time.Duration
-		Restore  bool
 	}
 
 	DataBase struct {
@@ -86,7 +85,7 @@ func (fs *FileStorage) Put(name string, data []byte, help helper) (int, error) {
 func (fs *FileStorage) restoreFromFile() (len int) {
 	b, err := os.ReadFile(fs.FilePath)
 	if err != nil {
-		l.Warn("No file to restore!")
+		log.Warn("No file to restore!")
 		return
 	}
 	buff := bytes.NewBuffer(b)
@@ -97,13 +96,13 @@ func (fs *FileStorage) restoreFromFile() (len int) {
 		name := gjson.GetBytes(bytes, m.ID).String()
 		len, _ = fs.Put(name, bytes, nil)
 	}
-	l.Info("number of metrics recovered from the file", zap.Int("len", len))
+	log.Info("number of metrics recovered from the file", zap.Int("len", len))
 	return
 
 }
 
 func (fs *FileStorage) dump() error {
-	l.Info("Dump starts")
+	log.Info("Dump starts")
 	var buf []byte
 	// объединение всех метрик в один байтовый срез(разделение с помощью '\n'):
 	fs.Mtx.RLock()
@@ -117,14 +116,14 @@ func (fs *FileStorage) dump() error {
 }
 
 func (fs *FileStorage) dumpWithInterval() {
-	l.Warn("fs.startTicker()...")
+	log.Info("fs.dumpWithInterval run...")
 	ticker := time.NewTicker(fs.Interval * time.Second)
 
 	go func() {
 		for {
 			<-ticker.C
 			if err := fs.dump(); err != nil {
-				l.Warn("fs.startTicker(): Couldn't save data to file")
+				log.Warn("fs.dumpWithInterval(): Couldn't save data to file")
 				return
 			}
 		}
