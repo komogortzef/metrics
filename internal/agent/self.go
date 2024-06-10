@@ -19,7 +19,6 @@ type SelfMonitor struct {
 	Address        string
 	PollInterval   int
 	ReportInterval int
-	SendFormat     string
 	Mtx            *sync.RWMutex
 }
 

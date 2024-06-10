@@ -81,7 +81,6 @@ func (cfg *agentConfig) setConfig() (Configurable, error) {
 		Address:        cfg.Address,
 		PollInterval:   cfg.PollInterval,
 		ReportInterval: cfg.ReportInterval,
-		SendFormat:     "json",
 		Mtx:            &sync.RWMutex{},
 	}
 

@@ -1,14 +1,18 @@
 package server
 
 import (
-	"fmt"
+	"bufio"
+	"bytes"
 	"os"
 	"sync"
 	"time"
 
 	l "metrics/internal/logger"
+	m "metrics/internal/models"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/tidwall/gjson"
+	"go.uber.org/zap"
 )
 
 type (
@@ -31,14 +35,12 @@ type (
 	}
 )
 
-func (ms *MemStorage) Put(name string, input []byte, helpers ...helper) (int, error) {
+func (ms *MemStorage) Put(name string, input []byte, help helper) (int, error) {
 	var err error
 	ms.Mtx.Lock()
 	old, exists := ms.Items[name]
-	for _, helper := range helpers { // применение доп логики перед сохранением
-		if exists {
-			input, err = helper(old, input)
-		}
+	if exists && help != nil {
+		input, err = help(old, input)
 	}
 	ms.Items[name] = input
 	if !exists {
@@ -57,17 +59,20 @@ func (ms *MemStorage) Get(name string) ([]byte, bool) {
 	return data, ok
 }
 
-func (ms *MemStorage) Pop(name string) ([]byte, error) {
-	data, exists := ms.Items[name]
-	if !exists {
-		return nil, fmt.Errorf("no such metric")
+func (ms *MemStorage) List() [][]byte {
+	i := 0
+	ms.Mtx.RLock()
+	metrics := make([][]byte, ms.len)
+	for _, met := range ms.Items {
+		metrics[i] = met
+		i++
 	}
-	delete(ms.Items, name)
-	return data, nil
+	ms.Mtx.RUnlock()
+	return metrics
 }
 
-func (fs *FileStorage) Put(name string, data []byte, helpers ...helper) (int, error) {
-	len, err := fs.MemStorage.Put(name, data, helpers...)
+func (fs *FileStorage) Put(name string, data []byte, help helper) (int, error) {
+	len, err := fs.MemStorage.Put(name, data, help)
 
 	if fs.Interval == 0 { // синхронная запись в файл при поступлении данных
 		if err = fs.dump(); err != nil {
@@ -78,23 +83,29 @@ func (fs *FileStorage) Put(name string, data []byte, helpers ...helper) (int, er
 	return len, err
 }
 
-func (ms *MemStorage) listFromMem() [][]byte {
-	metrics := make([][]byte, ms.len)
-	i := 0
-	ms.Mtx.RLock()
-	for _, met := range ms.Items {
-		metrics[i] = met
-		i++
+func (fs *FileStorage) restoreFromFile() (len int) {
+	b, err := os.ReadFile(fs.FilePath)
+	if err != nil {
+		l.Warn("No file to restore!")
+		return
 	}
-	ms.Mtx.RUnlock()
-	return metrics
+	buff := bytes.NewBuffer(b)
+	scanner := bufio.NewScanner(buff)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		bytes := scanner.Bytes()
+		name := gjson.GetBytes(bytes, m.ID).String()
+		len, _ = fs.Put(name, bytes, nil)
+	}
+	l.Info("number of metrics recovered from the file", zap.Int("len", len))
+	return
+
 }
 
 func (fs *FileStorage) dump() error {
 	l.Info("Dump starts")
 	var buf []byte
-
-	// объединение всех метрик в один байтовый срез(разделение с помощью '\n')
+	// объединение всех метрик в один байтовый срез(разделение с помощью '\n'):
 	fs.Mtx.RLock()
 	for _, data := range fs.Items {
 		data = append(data, byte('\n'))
@@ -105,7 +116,7 @@ func (fs *FileStorage) dump() error {
 	return os.WriteFile(fs.FilePath, buf, 0666)
 }
 
-func (fs *FileStorage) startTicker() {
+func (fs *FileStorage) dumpWithInterval() {
 	l.Warn("fs.startTicker()...")
 	ticker := time.NewTicker(fs.Interval * time.Second)
 
@@ -120,7 +131,7 @@ func (fs *FileStorage) startTicker() {
 	}()
 }
 
-func (db *DataBase) Put(name string, data []byte, helps ...helper) (int, error) {
+func (db *DataBase) Put(name string, data []byte, help helper) (int, error) {
 	return 0, nil
 }
 
@@ -128,6 +139,6 @@ func (db *DataBase) Get(key string) ([]byte, bool) {
 	return nil, false
 }
 
-func (db *DataBase) Pop(name string) ([]byte, error) {
-	return nil, nil
+func (db *DataBase) List() [][]byte {
+	return nil
 }

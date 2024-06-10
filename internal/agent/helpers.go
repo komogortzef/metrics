@@ -7,10 +7,7 @@ import (
 	"runtime"
 
 	c "metrics/internal/compress"
-	l "metrics/internal/logger"
 	m "metrics/internal/models"
-
-	"go.uber.org/zap"
 )
 
 var memStats = runtime.MemStats{}
@@ -51,41 +48,25 @@ func (sm *SelfMonitor) getMetrics() {
 	}
 }
 
-// отправка метрик в соотвествующем формате
+// отправка метрики
 func (sm *SelfMonitor) send(metric m.Metrics) error {
 	baseurl := "http://" + sm.Address + "/update/"
-	switch sm.SendFormat {
-	case "json":
-		jsonBytes, err := metric.MarshalJSON()
-		if err != nil {
-			return fmt.Errorf("coulnd't Marshall JSON: %w", err)
-		}
-		compJSON, err := c.Compress(jsonBytes)
-		if err != nil {
-			return fmt.Errorf("couldn't compress: %w", err)
-		}
-		req, err := http.NewRequest(http.MethodPost, baseurl, bytes.NewReader(compJSON))
-		if err != nil {
-			l.Warn("Create request error", zap.Error(err))
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Content-Encoding", "gzip")
-		return sendMetric(req)
-
-	default:
-		url := fmt.Sprintf("%s%s/%s/%v", baseurl, metric.MType, metric.ID, metric.Data())
-		req, err := http.NewRequest(http.MethodPost, url, nil)
-		if err != nil {
-			l.Warn("Couldn't create a req", zap.Error(err))
-		}
-		return sendMetric(req)
+	jsonBytes, err := metric.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("couldn't Marshall JSON: %w", err)
 	}
-}
+	compJSON, err := c.Compress(jsonBytes)
+	if err != nil {
+		return fmt.Errorf("couldn't compress: %w", err)
+	}
+	req, _ := http.NewRequest(http.MethodPost, baseurl, bytes.NewReader(compJSON))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
 
-func sendMetric(req *http.Request) error {
 	r, err := http.DefaultClient.Do(req)
 	if r != nil && r.Body != nil {
 		r.Body.Close()
 	}
+
 	return err
 }

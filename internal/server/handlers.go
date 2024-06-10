@@ -21,9 +21,9 @@ type (
 	helper func([]byte, []byte) ([]byte, error) // для доп операций перед сохраненим в Store
 
 	Repository interface {
-		Put(key string, data []byte, helpers ...helper) (int, error)
+		Put(key string, data []byte, help helper) (int, error)
 		Get(key string) ([]byte, bool)
-		Pop(key string) ([]byte, error)
+		List() [][]byte
 	}
 
 	MetricsManager struct {
@@ -51,7 +51,9 @@ func (mm *MetricsManager) Run() error {
 		if s.Restore {
 			s.restoreFromFile()
 		}
-		s.startTicker()
+		if s.Interval > 0 {
+			s.dumpWithInterval()
+		}
 	}
 
 	return mm.Serv.ListenAndServe()
@@ -75,12 +77,7 @@ func (mm *MetricsManager) UpdateHandler(rw http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	if mtype == m.Counter {
-		_, err = mm.Store.Put(name, bytes, addCounter)
-	} else {
-		_, err = mm.Store.Put(name, bytes)
-	}
-	if err != nil {
+	if _, err = mm.Store.Put(name, bytes, getHelper(mtype)); err != nil {
 		l.Warn("UpdateHandler(): storage error", zap.Error(err))
 		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
 		return
@@ -117,7 +114,7 @@ func (mm *MetricsManager) GetAllHandler(rw http.ResponseWriter, req *http.Reques
 	list := make([]Item, 0, m.MetricsNumber)
 
 	var metric m.Metrics
-	for _, bytes := range getList(mm.Store) {
+	for _, bytes := range mm.Store.List() {
 		_ = metric.UnmarshalJSON(bytes)
 		list = append(list, Item{Met: metric.String()})
 	}
@@ -144,12 +141,7 @@ func (mm *MetricsManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) 
 	name := gjson.GetBytes(bytes, m.ID).String()
 	mtype := gjson.GetBytes(bytes, m.Mtype).String()
 
-	if mtype == m.Counter {
-		_, err = mm.Store.Put(name, bytes, addCounter)
-	} else {
-		_, err = mm.Store.Put(name, bytes)
-	}
-	if err != nil {
+	if _, err = mm.Store.Put(name, bytes, getHelper(mtype)); err != nil {
 		l.Warn("UpdateJSON(): couldn't write to store", zap.Error(err))
 		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
 		return
