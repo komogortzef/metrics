@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	l "metrics/internal/logger"
+	log "metrics/internal/logger"
 	m "metrics/internal/models"
 
 	"go.uber.org/zap"
@@ -16,10 +16,9 @@ type SelfMonitor struct {
 	metrics        [m.MetricsNumber]m.Metrics
 	randVal        float64
 	pollCount      int64
-	Address        string
-	PollInterval   int
-	ReportInterval int
-	SendFormat     string
+	Address        string `env:"ADDRESS" envDefault:"none"`
+	PollInterval   int    `env:"POLL_INTERVAL" envDefault:"-1"`
+	ReportInterval int    `env:"REPORT_INTERVAL" envDefault:"-1"`
 	Mtx            *sync.RWMutex
 }
 
@@ -30,7 +29,7 @@ func (sm *SelfMonitor) collect() {
 		sm.randVal = rand.Float64()
 		sm.pollCount++
 		sm.getMetrics()
-		l.Debug("collect", zap.Int64("poll", sm.pollCount))
+		log.Debug("collect", zap.Int64("poll", sm.pollCount))
 		sm.Mtx.Unlock()
 		time.Sleep(time.Duration(sm.PollInterval) * time.Second)
 	}
@@ -41,23 +40,29 @@ func (sm *SelfMonitor) report() {
 	for {
 	sleep:
 		time.Sleep(time.Duration(sm.ReportInterval) * time.Second)
-		l.Debug("sending...")
+		log.Debug("sending...")
 		sm.Mtx.RLock()
 		for _, metric := range &sm.metrics {
 			err = sm.send(metric)
 			if err != nil {
-				l.Warn("Sending error", zap.Error(err))
+				log.Warn("Sending error", zap.Error(err))
 				sm.Mtx.RUnlock()
 				goto sleep
 			}
 		}
 		sm.pollCount = 0
-		l.Info("Success sending!")
+		log.Info("Success sending!")
 		sm.Mtx.RUnlock()
 	}
 }
 
 func (sm *SelfMonitor) Run() error {
+	sm.Mtx = &sync.RWMutex{}
+	log.Info("Agent configuration",
+		zap.String("addr", sm.Address),
+		zap.Int("poll interval", sm.PollInterval),
+		zap.Int("report interval", sm.ReportInterval))
+
 	go sm.collect()
 	sm.report()
 

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	l "metrics/internal/logger"
+	log "metrics/internal/logger"
 	m "metrics/internal/models"
 
 	"github.com/tidwall/gjson"
@@ -25,7 +25,6 @@ type (
 		MemStorage
 		FilePath string
 		Interval time.Duration
-		Restore  bool
 	}
 )
 
@@ -79,7 +78,7 @@ func (fs *FileStorage) Put(name string, data []byte, help helper) (int, error) {
 }
 
 func (fs *FileStorage) dump() error {
-	l.Info("Dump...")
+	log.Info("Dump...")
 	var buf []byte
 
 	// объединение всех метрик в один байтовый срез(разделение с помощью '\n')
@@ -94,14 +93,14 @@ func (fs *FileStorage) dump() error {
 }
 
 func (fs *FileStorage) startTicker() {
-	l.Warn("fs.startTicker()...")
+	log.Warn("fs.startTicker()...")
 	ticker := time.NewTicker(fs.Interval * time.Second)
 
 	go func() {
 		for {
 			<-ticker.C
 			if err := fs.dump(); err != nil {
-				l.Warn("fs.startTicker(): Couldn't save data to file")
+				log.Warn("fs.startTicker(): Couldn't save data to file")
 				return
 			}
 		}
@@ -109,9 +108,10 @@ func (fs *FileStorage) startTicker() {
 }
 
 func (fs *FileStorage) restoreFromFile() (len int) {
+	log.Info("RESTORE")
 	b, err := os.ReadFile(fs.FilePath)
 	if err != nil {
-		l.Warn("No file to restore!")
+		log.Warn("No file to restore!")
 		return
 	}
 	buff := bytes.NewBuffer(b)
@@ -120,9 +120,9 @@ func (fs *FileStorage) restoreFromFile() (len int) {
 	for scanner.Scan() {
 		bytes := scanner.Bytes()
 		name := gjson.GetBytes(bytes, m.ID).String()
-		len, _ = fs.Put(name, bytes, nil)
+		len, _ = fs.MemStorage.Put(name, bytes, nil)
 	}
-	l.Info("number of metrics recovered from the file", zap.Int("len", len))
+	log.Info("number of metrics recovered from the file", zap.Int("len", len))
 	return
 
 }
