@@ -36,7 +36,6 @@ func WithEnvCmd(cfg config) error {
 		storeInterv := flag.Int("i", m.DefaultStoreInterval, "Store interval arg: -i <sec>")
 		filePath := flag.String("f", m.DefaultStorePath, "File path arg: -f </path/to/file>")
 		rest := flag.Bool("r", m.DefaultRestore, "Restore storage arg: -r <true|false>")
-		dbAddr := flag.String("d", "", "DB address arg: -d <dbserver://username:password@host:port/db_name>")
 		flag.Parse()
 		if c.Address == "none" {
 			c.Address = *addr
@@ -51,9 +50,6 @@ func WithEnvCmd(cfg config) error {
 		}
 		if c.Restore {
 			c.Restore = *rest
-		}
-		if c.DBAddress == "none" {
-			c.DBAddress = *dbAddr
 		}
 	}
 

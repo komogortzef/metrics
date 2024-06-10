@@ -1,18 +1,14 @@
 package server
 
 import (
-	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
-	"time"
 
 	l "metrics/internal/logger"
 	m "metrics/internal/models"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
@@ -21,9 +17,9 @@ type (
 	helper func([]byte, []byte) ([]byte, error) // для доп операций перед сохраненим в Store
 
 	Repository interface {
-		Put(key string, data []byte, helpers ...helper) (int, error)
+		Put(key string, data []byte, help helper) (int, error)
 		Get(key string) ([]byte, bool)
-		Pop(key string) ([]byte, error)
+		List() [][]byte
 	}
 
 	MetricsManager struct {
@@ -34,24 +30,13 @@ type (
 
 // инициализация хранилища и запуск
 func (mm *MetricsManager) Run() error {
-	switch s := mm.Store.(type) {
-	case *DataBase:
-		config, err := pgxpool.ParseConfig(s.Addr)
-		if err != nil {
-			return fmt.Errorf("unable to parse connection string: %w", err)
+	if store, ok := mm.Store.(*FileStorage); ok {
+		if store.Restore {
+			store.restoreFromFile()
 		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-
-		if s.Pool, err = pgxpool.NewWithConfig(ctx, config); err != nil {
-			return fmt.Errorf("unable to create connection pool: %w", err)
+		if store.Interval > 0 {
+			store.startTicker()
 		}
-	case *FileStorage:
-		if s.Restore {
-			s.restoreFromFile()
-		}
-		s.startTicker()
 	}
 
 	return mm.Serv.ListenAndServe()
@@ -75,11 +60,7 @@ func (mm *MetricsManager) UpdateHandler(rw http.ResponseWriter, req *http.Reques
 		return
 	}
 
-	if mtype == m.Counter {
-		_, err = mm.Store.Put(name, bytes, addCounter)
-	} else {
-		_, err = mm.Store.Put(name, bytes)
-	}
+	_, err = mm.Store.Put(name, bytes, getHelper(mtype))
 	if err != nil {
 		l.Warn("UpdateHandler(): storage error", zap.Error(err))
 		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
@@ -117,7 +98,7 @@ func (mm *MetricsManager) GetAllHandler(rw http.ResponseWriter, req *http.Reques
 	list := make([]Item, 0, m.MetricsNumber)
 
 	var metric m.Metrics
-	for _, bytes := range getList(mm.Store) {
+	for _, bytes := range mm.Store.List() {
 		_ = metric.UnmarshalJSON(bytes)
 		list = append(list, Item{Met: metric.String()})
 	}
@@ -137,18 +118,14 @@ func (mm *MetricsManager) GetAllHandler(rw http.ResponseWriter, req *http.Reques
 func (mm *MetricsManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) {
 	bytes, err := io.ReadAll(req.Body)
 	if err != nil {
-		l.Warn("Couldn't read with decompress")
+		l.Warn("Couldn't read request body")
 	}
 	defer req.Body.Close()
 
 	name := gjson.GetBytes(bytes, m.ID).String()
 	mtype := gjson.GetBytes(bytes, m.Mtype).String()
 
-	if mtype == m.Counter {
-		_, err = mm.Store.Put(name, bytes, addCounter)
-	} else {
-		_, err = mm.Store.Put(name, bytes)
-	}
+	_, err = mm.Store.Put(name, bytes, getHelper(mtype))
 	if err != nil {
 		l.Warn("UpdateJSON(): couldn't write to store", zap.Error(err))
 		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
@@ -185,24 +162,4 @@ func (mm *MetricsManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusOK)
 	_, _ = rw.Write(bytes)
-}
-
-func (mm *MetricsManager) PingHandler(rw http.ResponseWriter, req *http.Request) {
-	db, ok := mm.Store.(*DataBase)
-	if !ok {
-		l.Warn("PingHandler(): Invalid storage type for ping")
-		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := db.Ping(ctx); err != nil {
-		l.Warn("PingHandler(): There is no connection to data base")
-		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
-		return
-	}
-	rw.WriteHeader(http.StatusOK)
-	rw.Write([]byte("The connection is established!"))
 }

@@ -47,7 +47,7 @@ func TestWrite(t *testing.T) {
 
 	for _, test := range tests {
 		log.Println("\n\nTEST:", test.name)
-		_, err := mem.Put("some", test.arg)
+		_, err := mem.Put("some", test.arg, nil)
 		assert.Equal(t, err, test.err)
 	}
 }
