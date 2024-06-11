@@ -42,8 +42,6 @@ func Configure(service Configurable, opts ...Option) (Configurable, error) {
 	return service, err
 }
 
-// заполнение значений полей структуры конфигурации переменными окружения,
-// или аргументами командной строки, или значениями по умолчанию
 func WithEnvCmd(service Configurable) (err error) {
 	err = env.Parse(service)
 	if err != nil {
@@ -111,13 +109,11 @@ func WithRoutes(service Configurable) (err error) {
 	return
 }
 
-// установка хранилища для сервера в зависимости от значений полей конфигурации
 func WithStorage(service Configurable) (err error) {
 	if manager, ok := service.(*server.MetricManager); ok {
 		if manager.DBAddress != "" {
 			manager.Store = &server.DataBase{
 				Pool: &pgxpool.Pool{},
-				Addr: manager.DBAddress,
 			}
 		} else if manager.FileStoragePath != "" {
 			manager.Store = &server.FileStorage{

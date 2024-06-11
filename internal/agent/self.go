@@ -62,6 +62,7 @@ func (sm *SelfMonitor) Run() error {
 		zap.Int("poll interval", sm.PollInterval),
 		zap.Int("report interval", sm.ReportInterval))
 
+	sm.Mtx = &sync.RWMutex{}
 	go sm.collect()
 	sm.report()
 

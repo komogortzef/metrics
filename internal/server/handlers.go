@@ -41,7 +41,7 @@ type (
 func (mm *MetricManager) Run() error {
 	switch store := mm.Store.(type) {
 	case *DataBase:
-		config, err := pgxpool.ParseConfig(store.Addr)
+		config, err := pgxpool.ParseConfig(mm.DBAddress)
 		if err != nil {
 			return fmt.Errorf("unable to parse connection string: %w", err)
 		}
@@ -51,6 +51,10 @@ func (mm *MetricManager) Run() error {
 
 		if store.Pool, err = pgxpool.NewWithConfig(ctx, config); err != nil {
 			return fmt.Errorf("unable to create connection pool: %w", err)
+		}
+
+		if err = store.createTables(ctx); err != nil {
+			return err
 		}
 	case *FileStorage:
 		if mm.Restore {

@@ -3,6 +3,8 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"context"
+	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -30,7 +32,6 @@ type (
 
 	DataBase struct {
 		*pgxpool.Pool
-		Addr string
 	}
 )
 
@@ -139,5 +140,34 @@ func (db *DataBase) Get(key string) ([]byte, bool) {
 }
 
 func (db *DataBase) List() [][]byte {
+	return nil
+}
+
+func (db *DataBase) createTables(ctx context.Context) error {
+	if err := db.Ping(ctx); err != nil {
+		return fmt.Errorf("db connection error: %w", err)
+	}
+
+	gaugeTable := `
+CREATE TABLE IF NOT EXISTS gauge(
+	id VARCHAR(255) PRIMARY KEY,
+	value DOUBLE PRECISION NOT NULL
+);`
+
+	if _, err := db.Exec(ctx, gaugeTable); err != nil {
+		return fmt.Errorf("couldn't create gauges table: %w", err)
+	}
+
+	counterTable := `
+CREATE TABLE IF NOT EXISTS counter(
+	id VARCHAR(255) PRIMARY KEY,
+	value BIGINT NOT NULL
+);`
+
+	if _, err := db.Exec(ctx, counterTable); err != nil {
+		return fmt.Errorf("couldn't create counter table: %w", err)
+	}
+
+	log.Info("Success creating tables!")
 	return nil
 }
