@@ -21,9 +21,9 @@ type (
 	helper func([]byte, []byte) ([]byte, error) // для доп операций перед сохраненим в Store
 
 	Repository interface {
-		Put(key string, data []byte, help helper) (int, error)
-		Get(key string) ([]byte, bool)
-		List() [][]byte
+		Put(key string, data []byte, helps ...helper) (int, error)
+		Get(key string) ([]byte, error)
+		List() ([][]byte, error)
 	}
 
 	MetricManager struct {
@@ -106,8 +106,8 @@ func (mm *MetricManager) GetHandler(rw http.ResponseWriter, req *http.Request) {
 	mtype := chi.URLParam(req, m.Mtype)
 	name := chi.URLParam(req, m.ID)
 
-	newBytes, ok := mm.Store.Get(name)
-	if !ok {
+	newBytes, err := mm.Store.Get(name)
+	if err != nil {
 		log.Warn("GetHandler(): Coundn't fetch the metric from store")
 		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
 		return
@@ -130,7 +130,8 @@ func (mm *MetricManager) GetAllHandler(rw http.ResponseWriter, req *http.Request
 	list := make([]Item, 0, m.MetricsNumber)
 
 	var metric m.Metrics
-	for _, bytes := range mm.Store.List() {
+	metrics, _ := mm.Store.List()
+	for _, bytes := range metrics {
 		_ = metric.UnmarshalJSON(bytes)
 		list = append(list, Item{Met: metric.String()})
 	}
@@ -183,8 +184,8 @@ func (mm *MetricManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
 	name := gjson.GetBytes(bytes, m.ID).String()
-	bytes, ok := mm.Store.Get(name)
-	if !ok {
+	bytes, err = mm.Store.Get(name)
+	if err != nil {
 		log.Warn("GetJSON(): No such metric in store")
 		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
 		return

@@ -62,7 +62,6 @@ func WithEnvCmd(service Configurable) (err error) {
 		if c.ReportInterval < 0 {
 			c.ReportInterval = *rep
 		}
-		c.Mtx = &sync.RWMutex{}
 	case *server.MetricManager:
 		storeInterv := flag.Int("i", m.DefaultStoreInterval, "Store interval arg: -i <sec>")
 		filePath := flag.String("f", m.DefaultStorePath, "File path arg: -f </path/to/file>")
@@ -113,7 +112,9 @@ func WithStorage(service Configurable) (err error) {
 	if manager, ok := service.(*server.MetricManager); ok {
 		if manager.DBAddress != "" {
 			manager.Store = &server.DataBase{
-				Pool: &pgxpool.Pool{},
+				Pool:     &pgxpool.Pool{},
+				Counters: map[string][]byte{},
+				Mtx:      &sync.RWMutex{},
 			}
 		} else if manager.FileStoragePath != "" {
 			manager.Store = &server.FileStorage{

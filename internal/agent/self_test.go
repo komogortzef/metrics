@@ -29,7 +29,7 @@ func TestReport(t *testing.T) {
 
 func TestCollect(t *testing.T) {
 	monitor := SelfMonitor{
-		Mtx: &sync.RWMutex{},
+		mtx: &sync.RWMutex{},
 	}
 
 	fmt.Println(monitor)
