@@ -16,7 +16,7 @@ func (ms *MemStorage) Put(name string, input []byte, helps ...helper) (int, erro
 	ms.Mtx.Lock()
 	old, exists := ms.Items[name]
 	for _, helper := range helps {
-		if helper != nil {
+		if helper != nil && exists {
 			input, err = helper(old, input)
 		}
 	}
