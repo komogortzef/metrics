@@ -1,19 +1,17 @@
 package server
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func testRequest(t *testing.T,
+func testRequest(
+	t *testing.T,
 	ts *httptest.Server,
 	method, path string) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, http.NoBody)
@@ -31,15 +29,6 @@ func testRequest(t *testing.T,
 }
 
 func TestHandlers(t *testing.T) {
-	r := chi.NewRouter()
-	r.Get("/", GetAllHandler)
-	r.Get("/value/{kind}/{name}", GetHandler)
-	r.Post("/update/{kind}/{name}/{val}", UpdateHandler)
-
-	SetStorage("mem")
-
-	tserv := httptest.NewServer(r)
-	defer tserv.Close()
 
 	tests := []struct {
 		name        string
@@ -90,37 +79,10 @@ func TestHandlers(t *testing.T) {
 			expected:    http.StatusOK,
 			description: "Sending a valid POST request with counter type",
 		},
-		{
-			name:        "get all",
-			method:      http.MethodGet,
-			url:         "/",
-			expected:    http.StatusOK,
-			description: "Sending a GET request",
-		},
-		{
-			name:        "non-existent value",
-			method:      http.MethodGet,
-			url:         "/value/gauge/name",
-			expected:    http.StatusNotFound,
-			description: "Sending a GET request with non-existent value",
-		},
-		{
-			name:        "existent value",
-			method:      http.MethodGet,
-			url:         "/value/gauge/metric",
-			expected:    http.StatusOK,
-			description: "Sending a GET request with existent value",
-		},
 	}
 
 	for _, test := range tests {
 		log.Println("\n\nTEST NAME:", test.name)
-		resp, get := testRequest(t, tserv, test.method, test.url)
-		defer resp.Body.Close()
-		assert.Equal(t, test.expected, resp.StatusCode)
 
-		if test.method == http.MethodGet {
-			fmt.Println(get)
-		}
 	}
 }

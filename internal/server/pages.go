@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"html/template"
-	"log"
+
+	l "metrics/internal/logger"
 )
 
 const getAllHTML = `<!DOCTYPE html>
@@ -14,15 +15,15 @@ const getAllHTML = `<!DOCTYPE html>
     <title>Metrics list</title>
   </head>
   <body>
-	<ul>{{ range .Data}}
-	<li>{{ .Name }} {{ .Value }}</li>{{ end }}
-	</ul>
+  	<h1>All metrics</h1>
+	<ol>{{ range .Data}}
+	<li>{{ .Met}}</li>{{ end }}
+	</ol>
   </body>
 </html>`
 
 type Item struct {
-	Name  string
-	Value string
+	Met string
 }
 
 type templateArgs struct {
@@ -34,7 +35,7 @@ func renderGetAll(data []Item) (*bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
 	err := indexTemplate.Execute(buf, templateArgs{Data: data})
 	if err != nil {
-		log.Println(err)
+		l.Warn("error html template exec")
 		return nil, errors.Unwrap(err)
 	}
 
