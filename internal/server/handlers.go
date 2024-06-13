@@ -41,6 +41,7 @@ type (
 func (mm *MetricManager) Run() error {
 	switch store := mm.Store.(type) {
 	case *DataBase:
+		log.Info("DB storage")
 		config, err := pgxpool.ParseConfig(mm.DBAddress)
 		if err != nil {
 			return fmt.Errorf("unable to parse connection string: %w", err)
@@ -56,7 +57,13 @@ func (mm *MetricManager) Run() error {
 		if err = store.createTables(ctx); err != nil {
 			return err
 		}
+
+		if err = store.prepareQueries(ctx); err != nil {
+			return err
+		}
+
 	case *FileStorage:
+		log.Info("File storage")
 		if mm.Restore {
 			store.restoreFromFile()
 		}
@@ -183,10 +190,12 @@ func (mm *MetricManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 	}
 	defer req.Body.Close()
 
+	log.Info("bytes", zap.String("bytes", string(bytes)))
+
 	name := gjson.GetBytes(bytes, m.ID).String()
-	bytes, err = mm.Store.Get(name)
-	if err != nil {
-		log.Warn("GetJSON(): No such metric in store")
+	log.Info("needed metric name", zap.String("name", name))
+	if bytes, err = mm.Store.Get(name); err != nil {
+		log.Warn("GetJSON(): No such metric in store", zap.Error(err))
 		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
 		return
 	}
@@ -214,4 +223,30 @@ func (mm *MetricManager) PingHandler(rw http.ResponseWriter, req *http.Request) 
 	}
 	rw.WriteHeader(http.StatusOK)
 	rw.Write([]byte("The connection is established!"))
+}
+
+func (mm *MetricManager) UpdatesJSON(rw http.ResponseWriter, req *http.Request) {
+	b, err := io.ReadAll(req.Body)
+	if err != nil {
+		log.Warn("UpdatesJSON(): Couldn't read request body")
+		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
+		return
+	}
+	defer req.Body.Close()
+
+	if db, ok := mm.Store.(*DataBase); ok {
+		if err = db.insertBatch(context.TODO(), b); err != nil {
+			log.Warn("UpdatesJSON(): couldn't send a batch", zap.Error(err))
+			http.Error(rw, m.InternalErrorMsg, http.StatusBadRequest)
+		}
+	} else {
+		gjson.ParseBytes(b).ForEach(func(key, value gjson.Result) bool {
+			name := value.Get(m.ID).String()
+			mtype := value.Get(m.Mtype).String()
+			_, _ = mm.Store.Put(name, []byte(value.Raw), getHelper(mtype))
+			return true
+		})
+	}
+	rw.WriteHeader(http.StatusOK)
+	rw.Write([]byte("Batch is accepted"))
 }

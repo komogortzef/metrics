@@ -13,7 +13,7 @@ import (
 )
 
 type SelfMonitor struct {
-	metrics        [m.MetricsNumber]m.Metrics
+	metrics        []m.Metrics
 	randVal        float64
 	pollCount      int64
 	Address        string `env:"ADDRESS" envDefault:"none"`
@@ -36,19 +36,15 @@ func (sm *SelfMonitor) collect() {
 }
 
 func (sm *SelfMonitor) report() {
-	var err error
 	for {
 	sleep:
 		time.Sleep(time.Duration(sm.ReportInterval) * time.Second)
 		log.Debug("sending...")
 		sm.mtx.RLock()
-		for _, metric := range &sm.metrics {
-			err = sm.send(metric)
-			if err != nil {
-				log.Warn("Sending error", zap.Error(err))
-				sm.mtx.RUnlock()
-				goto sleep
-			}
+		if err := sm.sendBatch(); err != nil {
+			log.Warn("Sending error", zap.Error(err))
+			sm.mtx.RUnlock()
+			goto sleep
 		}
 		sm.pollCount = 0
 		log.Info("Success sending!")

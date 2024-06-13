@@ -101,6 +101,7 @@ func WithRoutes(service Configurable) (err error) {
 		router.Get("/value/{type}/{id}", manager.GetHandler)
 		router.Post("/update/", compress.GzipMiddleware(manager.UpdateJSON))
 		router.Post("/update/{type}/{id}/{value}", manager.UpdateHandler)
+		router.Post("/updates/", compress.GzipMiddleware(manager.UpdatesJSON))
 
 		manager.Serv = &http.Server{
 			Addr:    manager.Address,
@@ -114,9 +115,7 @@ func WithStorage(service Configurable) (err error) {
 	if manager, ok := service.(*server.MetricManager); ok {
 		if manager.DBAddress != "" {
 			manager.Store = &server.DataBase{
-				Pool:     &pgxpool.Pool{},
-				Counters: map[string][]byte{},
-				Mtx:      &sync.RWMutex{},
+				Pool: &pgxpool.Pool{},
 			}
 		} else if manager.FileStoragePath != "" {
 			manager.Store = &server.FileStorage{

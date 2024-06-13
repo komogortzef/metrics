@@ -2,20 +2,19 @@ package agent
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"runtime"
 
 	c "metrics/internal/compress"
 	m "metrics/internal/models"
+
+	"github.com/pquerna/ffjson/ffjson"
 )
 
 var memStats = runtime.MemStats{}
 
-// формирование метрик и сбор в массив,
-// присваивание массива переменной структуры
 func (sm *SelfMonitor) getMetrics() {
-	sm.metrics = [m.MetricsNumber]m.Metrics{
+	sm.metrics = []m.Metrics{
 		m.BuildMetric("Alloc", float64(memStats.Alloc)),
 		m.BuildMetric("BuckHashSys", float64(memStats.BuckHashSys)),
 		m.BuildMetric("Frees", float64(memStats.Frees)),
@@ -48,18 +47,18 @@ func (sm *SelfMonitor) getMetrics() {
 	}
 }
 
-// отправка метрики
-func (sm *SelfMonitor) send(metric m.Metrics) error {
-	baseurl := "http://" + sm.Address + "/update/"
-	jsonBytes, err := metric.MarshalJSON()
+func (sm *SelfMonitor) sendBatch() error {
+	baseurl := "http://" + sm.Address + "/updates/"
+
+	data, err := ffjson.Marshal(sm.metrics)
 	if err != nil {
-		return fmt.Errorf("couldn't Marshall JSON: %w", err)
+		return err
 	}
-	compJSON, err := c.Compress(jsonBytes)
+	compData, err := c.Compress(data)
 	if err != nil {
-		return fmt.Errorf("couldn't compress: %w", err)
+		return err
 	}
-	req, _ := http.NewRequest(http.MethodPost, baseurl, bytes.NewReader(compJSON))
+	req, _ := http.NewRequest(http.MethodPost, baseurl, bytes.NewReader(compData))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
 
@@ -67,6 +66,5 @@ func (sm *SelfMonitor) send(metric m.Metrics) error {
 	if r != nil && r.Body != nil {
 		r.Body.Close()
 	}
-
 	return err
 }
