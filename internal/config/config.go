@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"sync"
-	"time"
 
 	"metrics/internal/agent"
 	"metrics/internal/compress"
@@ -16,7 +14,6 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type (
@@ -101,6 +98,7 @@ func WithRoutes(service Configurable) (err error) {
 		router.Get("/value/{type}/{id}", manager.GetHandler)
 		router.Post("/update/", compress.GzipMiddleware(manager.UpdateJSON))
 		router.Post("/update/{type}/{id}/{value}", manager.UpdateHandler)
+		router.Post("/updates/", compress.GzipMiddleware(manager.BatchHandler))
 
 		manager.Serv = &http.Server{
 			Addr:    manager.Address,
@@ -113,25 +111,13 @@ func WithRoutes(service Configurable) (err error) {
 func WithStorage(service Configurable) (err error) {
 	if manager, ok := service.(*server.MetricManager); ok {
 		if manager.DBAddress != "" {
-			manager.Store = &server.DataBase{
-				Pool:     &pgxpool.Pool{},
-				Counters: map[string][]byte{},
-				Mtx:      &sync.RWMutex{},
+			if manager.Store, err = server.NewDB(manager.DBAddress); err != nil {
+				return
 			}
 		} else if manager.FileStoragePath != "" {
-			manager.Store = &server.FileStorage{
-				MemStorage: server.MemStorage{
-					Items: make(map[string][]byte, m.MetricsNumber),
-					Mtx:   &sync.RWMutex{},
-				},
-				FilePath: manager.FileStoragePath,
-				Interval: time.Duration(manager.StoreInterval),
-			}
+			manager.Store = server.NewFileStore(manager.FileStoragePath)
 		} else {
-			manager.Store = &server.MemStorage{
-				Items: make(map[string][]byte, m.MetricsNumber),
-				Mtx:   &sync.RWMutex{},
-			}
+			manager.Store = server.NewMemStore()
 		}
 	}
 	return

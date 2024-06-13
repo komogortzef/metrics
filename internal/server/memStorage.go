@@ -5,35 +5,48 @@ import (
 	"sync"
 )
 
+const (
+	metricsNumber = 29
+)
+
 type MemStorage struct {
-	Items map[string][]byte
+	items map[string][]byte
 	len   int
-	Mtx   *sync.RWMutex
+	mtx   *sync.RWMutex
 }
 
-func (ms *MemStorage) Put(name string, input []byte, helps ...helper) (int, error) {
+func NewMemStore() *MemStorage {
+	return &MemStorage{
+		items: make(map[string][]byte, metricsNumber),
+		mtx:   &sync.RWMutex{},
+	}
+}
+
+func (ms *MemStorage) Put(name string, input []byte, helps ...helper) error {
 	var err error
-	ms.Mtx.Lock()
-	old, exists := ms.Items[name]
+	ms.mtx.Lock()
+	old, exists := ms.items[name]
 	for _, helper := range helps {
 		if helper != nil && exists {
-			input, err = helper(old, input)
+			if input, err = helper(old, input); err != nil {
+				goto withoutSave
+			}
 		}
 	}
-	ms.Items[name] = input
+	ms.items[name] = input
 	if !exists {
 		ms.len++
 	}
-	ms.Mtx.Unlock()
-
-	return ms.len, err
+withoutSave:
+	ms.mtx.Unlock()
+	return err
 }
 
 func (ms *MemStorage) Get(name string) ([]byte, error) {
 	var err error
-	ms.Mtx.RLock()
-	data, ok := ms.Items[name]
-	ms.Mtx.RUnlock()
+	ms.mtx.RLock()
+	data, ok := ms.items[name]
+	ms.mtx.RUnlock()
 	if !ok {
 		err = errors.New("no such metric")
 	}
@@ -43,12 +56,12 @@ func (ms *MemStorage) Get(name string) ([]byte, error) {
 
 func (ms *MemStorage) List() ([][]byte, error) {
 	i := 0
-	ms.Mtx.RLock()
+	ms.mtx.RLock()
 	metrics := make([][]byte, ms.len)
-	for _, met := range ms.Items {
+	for _, met := range ms.items {
 		metrics[i] = met
 		i++
 	}
-	ms.Mtx.RUnlock()
+	ms.mtx.RUnlock()
 	return metrics, nil
 }

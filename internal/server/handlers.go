@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -12,7 +11,6 @@ import (
 	m "metrics/internal/models"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
@@ -21,7 +19,7 @@ type (
 	helper func([]byte, []byte) ([]byte, error) // для доп операций перед сохраненим в Store
 
 	Repository interface {
-		Put(key string, data []byte, helps ...helper) (int, error)
+		Put(key string, data []byte, helps ...helper) error
 		Get(key string) ([]byte, error)
 		List() ([][]byte, error)
 	}
@@ -37,31 +35,22 @@ type (
 	}
 )
 
-// инициализация хранилища и запуск
 func (mm *MetricManager) Run() error {
 	switch store := mm.Store.(type) {
 	case *DataBase:
-		config, err := pgxpool.ParseConfig(mm.DBAddress)
-		if err != nil {
-			return fmt.Errorf("unable to parse connection string: %w", err)
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-
-		if store.Pool, err = pgxpool.NewWithConfig(ctx, config); err != nil {
-			return fmt.Errorf("unable to create connection pool: %w", err)
-		}
-
-		if err = store.createTables(ctx); err != nil {
+		if err := store.Ping(context.Background()); err != nil {
 			return err
 		}
 	case *FileStorage:
-		if mm.Restore {
-			store.restoreFromFile()
-		}
 		if mm.StoreInterval > 0 {
-			store.dumpWithInterval()
+			store.syncDump = false
+			store.dumpWithInterval(mm.StoreInterval)
+		}
+		if mm.Restore {
+			if err := store.restoreFromFile(); err != nil {
+				log.Warn("restore from file", zap.Error(err))
+			}
+			log.Info("number of metrics recovered from the file", zap.Int("len", store.len))
 		}
 	}
 
@@ -93,7 +82,7 @@ func (mm *MetricManager) UpdateHandler(rw http.ResponseWriter, req *http.Request
 		return
 	}
 
-	if _, err = mm.Store.Put(name, bytes, getHelper(mtype)); err != nil {
+	if err = mm.Store.Put(name, bytes, getHelper(mtype)); err != nil {
 		log.Warn("UpdateHandler(): storage error", zap.Error(err))
 		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
 		return
@@ -158,7 +147,7 @@ func (mm *MetricManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) {
 	name := gjson.GetBytes(bytes, m.ID).String()
 	mtype := gjson.GetBytes(bytes, m.Mtype).String()
 
-	if _, err = mm.Store.Put(name, bytes, getHelper(mtype)); err != nil {
+	if err = mm.Store.Put(name, bytes, getHelper(mtype)); err != nil {
 		log.Warn("UpdateJSON(): couldn't write to store", zap.Error(err))
 		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
 		return
@@ -183,10 +172,12 @@ func (mm *MetricManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 	}
 	defer req.Body.Close()
 
+	log.Info("bytes", zap.String("bytes", string(bytes)))
+
 	name := gjson.GetBytes(bytes, m.ID).String()
-	bytes, err = mm.Store.Get(name)
-	if err != nil {
-		log.Warn("GetJSON(): No such metric in store")
+	log.Info("needed metric name", zap.String("name", name))
+	if bytes, err = mm.Store.Get(name); err != nil {
+		log.Warn("GetJSON(): No such metric in store", zap.Error(err))
 		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
 		return
 	}
@@ -214,4 +205,30 @@ func (mm *MetricManager) PingHandler(rw http.ResponseWriter, req *http.Request) 
 	}
 	rw.WriteHeader(http.StatusOK)
 	rw.Write([]byte("The connection is established!"))
+}
+
+func (mm *MetricManager) BatchHandler(rw http.ResponseWriter, req *http.Request) {
+	b, err := io.ReadAll(req.Body)
+	if err != nil {
+		log.Warn("UpdatesJSON(): Couldn't read request body")
+		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
+		return
+	}
+	defer req.Body.Close()
+
+	if db, ok := mm.Store.(*DataBase); ok {
+		if err = db.insertBatch(context.TODO(), b); err != nil {
+			log.Warn("UpdatesJSON(): couldn't send a batch", zap.Error(err))
+			http.Error(rw, m.InternalErrorMsg, http.StatusBadRequest)
+		}
+	} else {
+		gjson.ParseBytes(b).ForEach(func(key, value gjson.Result) bool {
+			name := value.Get(m.ID).String()
+			mtype := value.Get(m.Mtype).String()
+			_ = mm.Store.Put(name, []byte(value.Raw), getHelper(mtype))
+			return true
+		})
+	}
+	rw.WriteHeader(http.StatusOK)
+	rw.Write([]byte("Batch is accepted"))
 }

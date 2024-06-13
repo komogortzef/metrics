@@ -10,30 +10,36 @@ import (
 	m "metrics/internal/models"
 
 	"github.com/tidwall/gjson"
-	"go.uber.org/zap"
 )
 
 type FileStorage struct {
 	MemStorage
-	FilePath string
-	Interval time.Duration
+	filePath string
+	syncDump bool
 }
 
-func (fs *FileStorage) Put(name string, data []byte, helps ...helper) (int, error) {
-	len, err := fs.MemStorage.Put(name, data, helps...)
-	if fs.Interval == 0 { // синхронная запись в файл при поступлении данных
+func NewFileStore(path string) *FileStorage {
+	return &FileStorage{
+		MemStorage: *NewMemStore(),
+		filePath:   path,
+		syncDump:   true,
+	}
+}
+
+func (fs *FileStorage) Put(name string, data []byte, helps ...helper) error {
+	err := fs.MemStorage.Put(name, data, helps...)
+	if fs.syncDump {
 		if err = fs.dump(); err != nil {
-			return len, err
+			return err
 		}
 	}
-	return len, err
+	return err
 }
 
-func (fs *FileStorage) restoreFromFile() (len int) {
-	b, err := os.ReadFile(fs.FilePath)
+func (fs *FileStorage) restoreFromFile() error {
+	b, err := os.ReadFile(fs.filePath)
 	if err != nil {
-		log.Warn("No file to restore!")
-		return
+		return err
 	}
 	buff := bytes.NewBuffer(b)
 	scanner := bufio.NewScanner(buff)
@@ -41,35 +47,33 @@ func (fs *FileStorage) restoreFromFile() (len int) {
 	for scanner.Scan() {
 		bytes := scanner.Bytes()
 		name := gjson.GetBytes(bytes, m.ID).String()
-		len, _ = fs.Put(name, bytes)
+		_ = fs.Put(name, bytes) // ошибка не может здесь возникнуть(addCount не задействован)
 	}
-	log.Info("number of metrics recovered from the file", zap.Int("len", len))
-	return
+	return err
 }
 
 func (fs *FileStorage) dump() error {
 	log.Info("Dump starts")
 	var buf []byte
 	// объединение всех метрик в один байтовый срез(разделение с помощью '\n'):
-	fs.Mtx.RLock()
-	for _, data := range fs.Items {
+	fs.mtx.RLock()
+	for _, data := range fs.items {
 		data = append(data, byte('\n'))
 		buf = append(buf, data...)
 	}
-	fs.Mtx.RUnlock()
+	fs.mtx.RUnlock()
 
-	return os.WriteFile(fs.FilePath, buf, 0666)
+	return os.WriteFile(fs.filePath, buf, 0666)
 }
 
-func (fs *FileStorage) dumpWithInterval() {
-	log.Info("fs.dumpWithInterval run...")
-	ticker := time.NewTicker(fs.Interval * time.Second)
-
+func (fs *FileStorage) dumpWithInterval(interval int) {
+	log.Info("fs.dumpWithinterval run...")
+	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	go func() {
 		for {
 			<-ticker.C
 			if err := fs.dump(); err != nil {
-				log.Warn("fs.dumpWithInterval(): Couldn't save data to file")
+				log.Warn("fs.dumpWithinterval(): Couldn't save data to file")
 				return
 			}
 		}
