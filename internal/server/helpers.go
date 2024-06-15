@@ -3,9 +3,11 @@ package server
 import (
 	"fmt"
 
+	log "metrics/internal/logger"
 	m "metrics/internal/models"
 
 	"github.com/tidwall/gjson"
+	"go.uber.org/zap"
 )
 
 func addCounter(old []byte, input []byte) ([]byte, error) {
@@ -15,6 +17,7 @@ func addCounter(old []byte, input []byte) ([]byte, error) {
 	}
 	num := gjson.GetBytes(input, m.Delta).Int()
 	*oldStruct.Delta += num
+	log.Info("add count", zap.Int64("old", *oldStruct.Delta))
 
 	return oldStruct.MarshalJSON()
 }

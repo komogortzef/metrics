@@ -16,6 +16,7 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type (
@@ -64,11 +65,11 @@ func WithEnvCmd(service Configurable) (err error) {
 			c.ReportInterval = *rep
 		}
 	case *server.MetricManager:
-		rest := flag.Bool("r", m.DefaultRestore, "Restore storage arg: -r <true|false>")
 		storeInterv := flag.Int("i", m.DefaultStoreInterval, "Store interval arg: -i <sec>")
 		filePath := flag.String("f", m.DefaultStorePath, "File path arg: -f </path/to/file>")
+		rest := flag.Bool("r", m.DefaultRestore, "Restore storage arg: -r <true|false>")
+		dbAddr := flag.String("d", "", "DB address arg: -d <dbserver://username:password@host:port/db_name>")
 		flag.Parse()
-		fmt.Println("rest:", *rest)
 		if c.Address == "none" {
 			c.Address = *addr
 		}
@@ -83,6 +84,9 @@ func WithEnvCmd(service Configurable) (err error) {
 		if c.Restore {
 			c.Restore = *rest
 		}
+		if c.DBAddress == "none" {
+			c.DBAddress = *dbAddr
+		}
 	}
 	return
 }
@@ -92,10 +96,12 @@ func WithRoutes(service Configurable) (err error) {
 		router := chi.NewRouter()
 		router.Use(log.WithHandlerLog)
 		router.Get("/", compress.GzipMiddleware(manager.GetAllHandler))
+		router.Get("/ping", manager.PingHandler)
 		router.Post("/value/", compress.GzipMiddleware(manager.GetJSON))
 		router.Get("/value/{type}/{id}", manager.GetHandler)
 		router.Post("/update/", compress.GzipMiddleware(manager.UpdateJSON))
 		router.Post("/update/{type}/{id}/{value}", manager.UpdateHandler)
+		router.Post("/updates/", compress.GzipMiddleware(manager.UpdatesJSON))
 
 		manager.Serv = &http.Server{
 			Addr:    manager.Address,
@@ -105,10 +111,13 @@ func WithRoutes(service Configurable) (err error) {
 	return
 }
 
-// установка хранилища для сервера в зависимости от значений полей конфигурации
 func WithStorage(service Configurable) (err error) {
 	if manager, ok := service.(*server.MetricManager); ok {
-		if manager.FileStoragePath != "" {
+		if manager.DBAddress != "" {
+			manager.Store = &server.DataBase{
+				Pool: &pgxpool.Pool{},
+			}
+		} else if manager.FileStoragePath != "" {
 			manager.Store = &server.FileStorage{
 				MemStorage: server.MemStorage{
 					Items: make(map[string][]byte, m.MetricsNumber),

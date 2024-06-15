@@ -9,8 +9,7 @@ import (
 )
 
 func main() {
-	server, err := c.Configure(
-		&server.MetricManager{},
+	server, err := c.Configure(&server.MetricManager{},
 		c.WithEnvCmd,
 		c.WithRoutes,
 		c.WithStorage,
