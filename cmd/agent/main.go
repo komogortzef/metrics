@@ -9,12 +9,13 @@ import (
 )
 
 func main() {
-	agent, err := config.Configure(&agent.SelfMonitor{}, config.WithEnvCmd)
+	ctx, complete := config.CompletionCtx()
+	defer complete()
+
+	agent, err := config.Configure(ctx, &agent.SelfMonitor{}, config.WithEnvCmd)
 	if err != nil {
 		log.Fatal("agent config error", zap.Error(err))
 	}
 
-	if err = agent.Run(); err != nil {
-		log.Fatal("agent run error", zap.Error(err))
-	}
+	agent.Run(ctx)
 }

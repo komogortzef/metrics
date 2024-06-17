@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"time"
 
 	log "metrics/internal/logger"
 	m "metrics/internal/models"
@@ -17,14 +16,12 @@ type DataBase struct {
 	*pgxpool.Pool
 }
 
-func NewDB(addr string) (*DataBase, error) {
+func NewDB(ctx context.Context, addr string) (*DataBase, error) {
 	log.Info("DB storage creating")
 	config, err := pgxpool.ParseConfig(addr)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse connection string: %w", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
@@ -40,34 +37,35 @@ func NewDB(addr string) (*DataBase, error) {
 	return &DataBase{Pool: pool}, nil
 }
 
-func (db *DataBase) Put(_ string, data []byte, _ ...helper) error {
+func (db *DataBase) Put(ctx context.Context,
+	_ string, data []byte, _ ...helper) error {
 	log.Info("DB Put ...")
 
-	conn, err := db.Acquire(context.TODO())
+	conn, err := db.Acquire(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to acquire: %w", err)
 	}
 	defer conn.Release()
 
 	if gjson.GetBytes(data, "type").String() == m.Counter {
-		_, err = conn.Exec(context.TODO(), "counterQuery", data)
+		_, err = conn.Exec(ctx, "counterQuery", data)
 	} else {
-		_, err = conn.Exec(context.TODO(), "gaugeQuery", data)
+		_, err = conn.Exec(ctx, "gaugeQuery", data)
 	}
 
 	return err
 }
 
-func (db *DataBase) Get(key string) ([]byte, error) {
+func (db *DataBase) Get(ctx context.Context, key string) ([]byte, error) {
 	log.Info("DB Get...")
 	var data []byte
-	conn, err := db.Acquire(context.TODO())
+	conn, err := db.Acquire(ctx)
 	if err != nil {
 		return data, fmt.Errorf("failed to acquire: %w", err)
 	}
 	defer conn.Release()
 
-	err = conn.QueryRow(context.TODO(), "selectMetric", key).Scan(&data)
+	err = conn.QueryRow(ctx, "selectMetric", key).Scan(&data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -75,15 +73,15 @@ func (db *DataBase) Get(key string) ([]byte, error) {
 	return data, err
 }
 
-func (db *DataBase) List() (metrics [][]byte, err error) {
+func (db *DataBase) List(ctx context.Context) (metrics [][]byte, err error) {
 	log.Info("DB List...")
-	conn, err := db.Acquire(context.TODO())
+	conn, err := db.Acquire(ctx)
 	if err != nil {
 		return metrics, fmt.Errorf("failed to acquire: %w", err)
 	}
 	defer conn.Release()
 
-	rows, err := conn.Query(context.TODO(), "selectAll")
+	rows, err := conn.Query(ctx, "selectAll")
 	if err != nil {
 		return nil, err
 	}

@@ -9,13 +9,14 @@ import (
 )
 
 func main() {
-	server, err := config.Configure(&server.MetricManager{},
+	ctx, complete := config.CompletionCtx()
+	defer complete()
+
+	server, err := config.Configure(ctx, &server.MetricManager{},
 		config.WithEnvCmd, config.WithRoutes, config.WithStorage)
 	if err != nil {
 		log.Fatal("server config error", zap.Error(err))
 	}
 
-	if err = server.Run(); err != nil {
-		log.Fatal("server running error", zap.Error(err))
-	}
+	server.Run(ctx)
 }

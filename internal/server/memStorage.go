@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"sync"
 )
@@ -22,14 +23,15 @@ func NewMemStore() *MemStorage {
 	}
 }
 
-func (ms *MemStorage) Put(name string, input []byte, helps ...helper) error {
+func (ms *MemStorage) Put(ctx context.Context,
+	name string, input []byte, helps ...helper) error {
 	var err error
 	ms.mtx.Lock()
 	old, exists := ms.items[name]
 	for _, helper := range helps {
 		if helper != nil && exists {
 			if input, err = helper(old, input); err != nil {
-				goto withoutSave
+				return err
 			}
 		}
 	}
@@ -37,12 +39,11 @@ func (ms *MemStorage) Put(name string, input []byte, helps ...helper) error {
 	if !exists {
 		ms.len++
 	}
-withoutSave:
 	ms.mtx.Unlock()
 	return err
 }
 
-func (ms *MemStorage) Get(name string) ([]byte, error) {
+func (ms *MemStorage) Get(ctx context.Context, name string) ([]byte, error) {
 	var err error
 	ms.mtx.RLock()
 	data, ok := ms.items[name]
@@ -54,7 +55,7 @@ func (ms *MemStorage) Get(name string) ([]byte, error) {
 	return data, err
 }
 
-func (ms *MemStorage) List() ([][]byte, error) {
+func (ms *MemStorage) List(ctx context.Context) ([][]byte, error) {
 	i := 0
 	ms.mtx.RLock()
 	metrics := make([][]byte, ms.len)

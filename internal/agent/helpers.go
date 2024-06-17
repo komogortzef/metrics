@@ -13,7 +13,7 @@ import (
 
 var memStats = runtime.MemStats{}
 
-func (sm *SelfMonitor) getMetrics() {
+func (sm *SelfMonitor) collectMetrics() {
 	sm.metrics = []m.Metrics{
 		m.BuildMetric("Alloc", float64(memStats.Alloc)),
 		m.BuildMetric("BuckHashSys", float64(memStats.BuckHashSys)),
@@ -48,17 +48,16 @@ func (sm *SelfMonitor) getMetrics() {
 }
 
 func (sm *SelfMonitor) sendBatch() error {
-	baseurl := "http://" + sm.Address + "/updates/"
-
+	url := "http://" + sm.Address + "/updates/"
 	data, err := ffjson.Marshal(sm.metrics)
 	if err != nil {
 		return err
 	}
-	compData, err := c.Compress(data)
+	compressData, err := c.Compress(data)
 	if err != nil {
 		return err
 	}
-	req, _ := http.NewRequest(http.MethodPost, baseurl, bytes.NewReader(compData))
+	req, _ := http.NewRequest(http.MethodPost, url, bytes.NewReader(compressData))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
 

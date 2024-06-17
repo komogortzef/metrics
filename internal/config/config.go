@@ -1,53 +1,64 @@
 package config
 
 import (
+	ctx "context"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"metrics/internal/agent"
-	"metrics/internal/compress"
+	c "metrics/internal/compress"
 	log "metrics/internal/logger"
 	m "metrics/internal/models"
 	"metrics/internal/server"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
-type (
-	Configurable interface {
-		Run() error
-	}
+type Config interface {
+	Run(ctx.Context)
+}
 
-	Option  func(Configurable) error
-	Service uint8
-)
+type Option func(ctx.Context, Config) error
 
-func Configure(service Configurable, opts ...Option) (Configurable, error) {
+func Configure(ctx ctx.Context, cfg Config, opts ...Option) (Config, error) {
 	err := log.InitLog()
 	if err != nil {
 		return nil, err
 	}
 	for _, opt := range opts {
-		if err = opt(service); err != nil {
+		if err = opt(ctx, cfg); err != nil {
 			break
 		}
 	}
 
-	return service, err
+	return cfg, err
 }
 
-// заполнение значений полей структуры конфигурации переменными окружения,
-// или аргументами командной строки, или значениями по умолчанию
-func WithEnvCmd(service Configurable) (err error) {
-	err = env.Parse(service)
+func CompletionCtx() (ctx.Context, ctx.CancelFunc) {
+	ctx, complete := ctx.WithCancel(ctx.Background())
+	signChan := make(chan os.Signal, 1)
+	signal.Notify(signChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-signChan
+		complete()
+	}()
+
+	return ctx, complete
+}
+
+func WithEnvCmd(_ ctx.Context, cfg Config) (err error) {
+	err = env.Parse(cfg)
 	if err != nil {
 		return fmt.Errorf("env parse error: %w", err)
 	}
 	addr := flag.String("a", m.DefaultEndpoint, "Endpoint arg: -a <host:port>")
-	switch c := service.(type) {
+	switch c := cfg.(type) {
 	case *agent.SelfMonitor:
 		poll := flag.Int("p", m.DefaultPollInterval, "Poll Interval arg: -p <sec>")
 		rep := flag.Int("r", m.DefaultReportInterval, "Report interval arg: -r <sec>")
@@ -88,17 +99,23 @@ func WithEnvCmd(service Configurable) (err error) {
 	return
 }
 
-func WithRoutes(service Configurable) (err error) {
-	if manager, ok := service.(*server.MetricManager); ok {
+func WithRoutes(ctx ctx.Context, cfg Config) (_ error) {
+	if manager, ok := cfg.(*server.MetricManager); ok {
+		ctxMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				r = r.WithContext(ctx)
+				next.ServeHTTP(w, r)
+			}
+		}
 		router := chi.NewRouter()
 		router.Use(log.WithHandlerLog)
-		router.Get("/", compress.GzipMiddleware(manager.GetAllHandler))
-		router.Get("/ping", manager.PingHandler)
-		router.Post("/value/", compress.GzipMiddleware(manager.GetJSON))
-		router.Get("/value/{type}/{id}", manager.GetHandler)
-		router.Post("/update/", compress.GzipMiddleware(manager.UpdateJSON))
-		router.Post("/update/{type}/{id}/{value}", manager.UpdateHandler)
-		router.Post("/updates/", compress.GzipMiddleware(manager.BatchHandler))
+		router.Get("/", ctxMiddleware(c.GzipMiddleware(manager.GetAllHandler)))
+		router.Get("/ping", ctxMiddleware(manager.PingHandler))
+		router.Post("/value/", ctxMiddleware(c.GzipMiddleware(manager.GetJSON)))
+		router.Get("/value/{type}/{id}", ctxMiddleware(manager.GetHandler))
+		router.Post("/update/", ctxMiddleware(c.GzipMiddleware(manager.UpdateJSON)))
+		router.Post("/update/{type}/{id}/{value}", ctxMiddleware(manager.UpdateHandler))
+		router.Post("/updates/", ctxMiddleware(c.GzipMiddleware(manager.BatchHandler)))
 
 		manager.Serv = &http.Server{
 			Addr:    manager.Address,
@@ -108,17 +125,26 @@ func WithRoutes(service Configurable) (err error) {
 	return
 }
 
-func WithStorage(service Configurable) (err error) {
-	if manager, ok := service.(*server.MetricManager); ok {
+func WithStorage(ctx ctx.Context, cfg Config) (err error) {
+	if manager, ok := cfg.(*server.MetricManager); ok {
 		if manager.DBAddress != "" {
-			if manager.Store, err = server.NewDB(manager.DBAddress); err != nil {
-				return
+			if manager.Store, err = server.NewDB(ctx, manager.DBAddress); err != nil {
+				return err
 			}
 		} else if manager.FileStoragePath != "" {
-			manager.Store = server.NewFileStore(manager.FileStoragePath)
+			store := server.NewFileStore(manager.FileStoragePath)
+			if manager.StoreInterval > 0 {
+				store.SyncDump = false
+			}
+			if manager.Restore {
+				if err := store.RestoreFromFile(ctx); err != nil {
+					log.Warn("restore from file error", zap.Error(err))
+				}
+			}
+			manager.Store = store
 		} else {
 			manager.Store = server.NewMemStore()
 		}
 	}
-	return
+	return err
 }

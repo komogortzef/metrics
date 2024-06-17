@@ -45,7 +45,7 @@ var (
 )
 
 // сборка метрики для сервера
-func NewMetric(id, mtype string, val any) (Metrics, error) {
+func NewMetric(mtype, id string, val any) (Metrics, error) {
 	var metric Metrics
 	if mtype != Counter && mtype != Gauge {
 		return metric, ErrInvalidType

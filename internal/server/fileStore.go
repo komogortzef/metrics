@@ -3,10 +3,9 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"os"
-	"time"
 
-	log "metrics/internal/logger"
 	m "metrics/internal/models"
 
 	"github.com/tidwall/gjson"
@@ -14,30 +13,31 @@ import (
 
 type FileStorage struct {
 	MemStorage
-	filePath string
-	syncDump bool
+	FilePath string
+	SyncDump bool
 }
 
 func NewFileStore(path string) *FileStorage {
 	return &FileStorage{
 		MemStorage: *NewMemStore(),
-		filePath:   path,
-		syncDump:   true,
+		FilePath:   path,
+		SyncDump:   true,
 	}
 }
 
-func (fs *FileStorage) Put(name string, data []byte, helps ...helper) error {
-	err := fs.MemStorage.Put(name, data, helps...)
-	if fs.syncDump {
-		if err = fs.dump(); err != nil {
+func (fs *FileStorage) Put(ctx context.Context,
+	name string, data []byte, helps ...helper) error {
+	err := fs.MemStorage.Put(ctx, name, data, helps...)
+	if fs.SyncDump {
+		if err = dump(ctx, fs.FilePath, fs); err != nil {
 			return err
 		}
 	}
 	return err
 }
 
-func (fs *FileStorage) restoreFromFile() error {
-	b, err := os.ReadFile(fs.filePath)
+func (fs *FileStorage) RestoreFromFile(ctx context.Context) error {
+	b, err := os.ReadFile(fs.FilePath)
 	if err != nil {
 		return err
 	}
@@ -47,35 +47,7 @@ func (fs *FileStorage) restoreFromFile() error {
 	for scanner.Scan() {
 		bytes := scanner.Bytes()
 		name := gjson.GetBytes(bytes, m.ID).String()
-		_ = fs.Put(name, bytes) // ошибка не может здесь возникнуть(addCount не задействован)
+		_ = fs.MemStorage.Put(ctx, name, bytes) // ошибка не может здесь возникнуть(addCount не задействован)
 	}
 	return err
-}
-
-func (fs *FileStorage) dump() error {
-	log.Info("Dump starts")
-	var buf []byte
-	// объединение всех метрик в один байтовый срез(разделение с помощью '\n'):
-	fs.mtx.RLock()
-	for _, data := range fs.items {
-		data = append(data, byte('\n'))
-		buf = append(buf, data...)
-	}
-	fs.mtx.RUnlock()
-
-	return os.WriteFile(fs.filePath, buf, 0666)
-}
-
-func (fs *FileStorage) dumpWithInterval(interval int) {
-	log.Info("fs.dumpWithinterval run...")
-	ticker := time.NewTicker(time.Duration(interval) * time.Second)
-	go func() {
-		for {
-			<-ticker.C
-			if err := fs.dump(); err != nil {
-				log.Warn("fs.dumpWithinterval(): Couldn't save data to file")
-				return
-			}
-		}
-	}()
 }

@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"math/rand"
 	"runtime"
 	"sync"
@@ -28,7 +29,7 @@ func (sm *SelfMonitor) collect() {
 		runtime.ReadMemStats(&memStats)
 		sm.randVal = rand.Float64()
 		sm.pollCount++
-		sm.getMetrics()
+		sm.collectMetrics()
 		log.Debug("collect", zap.Int64("poll", sm.pollCount))
 		sm.mtx.Unlock()
 		time.Sleep(time.Duration(sm.PollInterval) * time.Second)
@@ -52,15 +53,14 @@ func (sm *SelfMonitor) report() {
 	}
 }
 
-func (sm *SelfMonitor) Run() error {
+func (sm *SelfMonitor) Run(ctx context.Context) {
 	log.Info("Agent configuration",
 		zap.String("addr", sm.Address),
 		zap.Int("poll interval", sm.PollInterval),
 		zap.Int("report interval", sm.ReportInterval))
-
 	sm.mtx = &sync.RWMutex{}
 	go sm.collect()
-	sm.report()
-
-	return nil // чтобы удовлетворить Configurable
+	go sm.report()
+	<-ctx.Done()
+	log.Debug("Goodbye!")
 }
