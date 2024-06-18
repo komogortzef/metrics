@@ -48,7 +48,7 @@ func (mm *MetricManager) Run(ctx context.Context) {
 		close(errChan)
 	}()
 
-	if mm.StoreInterval > 0 && mm.FileStoragePath != "" {
+	if mm.StoreInterval > 0 && mm.FileStoragePath != m.NoStorage {
 		dumpWait(ctx, mm.Store, mm.FileStoragePath, mm.StoreInterval)
 	}
 

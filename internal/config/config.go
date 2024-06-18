@@ -36,7 +36,6 @@ func Configure(ctx ctx.Context, cfg Config, opts ...Option) (Config, error) {
 			break
 		}
 	}
-
 	return cfg, err
 }
 
@@ -48,52 +47,60 @@ func CompletionCtx() (ctx.Context, ctx.CancelFunc) {
 		<-signChan
 		complete()
 	}()
-
 	return ctx, complete
 }
 
-func WithEnvCmd(_ ctx.Context, cfg Config) (err error) {
+func EnvFlagsAgent(_ ctx.Context, cfg Config) (err error) {
 	err = env.Parse(cfg)
 	if err != nil {
 		return fmt.Errorf("env parse error: %w", err)
 	}
-	addr := flag.String("a", m.DefaultEndpoint, "Endpoint arg: -a <host:port>")
-	switch c := cfg.(type) {
-	case *agent.SelfMonitor:
+	if agent, ok := cfg.(*agent.SelfMonitor); ok {
+		addr := flag.String("a", m.DefaultEndpoint, "Endpoint arg: -a <host:port>")
 		poll := flag.Int("p", m.DefaultPollInterval, "Poll Interval arg: -p <sec>")
 		rep := flag.Int("r", m.DefaultReportInterval, "Report interval arg: -r <sec>")
 		flag.Parse()
-		if c.Address == "none" {
-			c.Address = *addr
+		if agent.Address == "none" {
+			agent.Address = *addr
 		}
-		if c.PollInterval < 0 {
-			c.PollInterval = *poll
+		if agent.PollInterval < 0 {
+			agent.PollInterval = *poll
 		}
-		if c.ReportInterval < 0 {
-			c.ReportInterval = *rep
+		if agent.ReportInterval < 0 {
+			agent.ReportInterval = *rep
 		}
-	case *server.MetricManager:
+	}
+	return err
+}
+
+func EnvFlagsServer(_ ctx.Context, cfg Config) (err error) {
+	err = env.Parse(cfg)
+	if err != nil {
+		return fmt.Errorf("env parse error: %w", err)
+	}
+	if server, ok := cfg.(*server.MetricManager); ok {
+		addr := flag.String("a", m.DefaultEndpoint, "Endpoint arg: -a <host:port>")
 		storeInterv := flag.Int("i", m.DefaultStoreInterval, "Store interval arg: -i <sec>")
 		filePath := flag.String("f", m.DefaultStorePath, "File path arg: -f </path/to/file>")
 		rest := flag.Bool("r", m.DefaultRestore, "Restore storage arg: -r <true|false>")
-		dbAddr := flag.String("d", "", "DB address arg: -d <dbserver://username:password@host:port/db_name>")
+		dbAddr := flag.String("d", m.NoStorage, "DB address arg: -d <dbserver://username:password@host:port/db_name>")
 		flag.Parse()
-		if c.Address == "none" {
-			c.Address = *addr
+		if server.Address == "none" {
+			server.Address = *addr
 		}
-		if c.StoreInterval < 0 {
-			c.StoreInterval = *storeInterv
+		if server.StoreInterval < 0 {
+			server.StoreInterval = *storeInterv
 		}
 		if filestore, ok := os.LookupEnv("FILE_STORAGE_PATH"); !ok {
-			c.FileStoragePath = *filePath
+			server.FileStoragePath = *filePath
 		} else {
-			c.FileStoragePath = filestore
+			server.FileStoragePath = filestore
 		}
-		if c.Restore {
-			c.Restore = *rest
+		if server.Restore {
+			server.Restore = *rest
 		}
-		if c.DBAddress == "none" {
-			c.DBAddress = *dbAddr
+		if server.DBAddress == "none" {
+			server.DBAddress = *dbAddr
 		}
 	}
 	return
@@ -116,7 +123,6 @@ func WithRoutes(ctx ctx.Context, cfg Config) (_ error) {
 		router.Post("/update/", ctxMiddleware(c.GzipMiddleware(manager.UpdateJSON)))
 		router.Post("/update/{type}/{id}/{value}", ctxMiddleware(manager.UpdateHandler))
 		router.Post("/updates/", ctxMiddleware(c.GzipMiddleware(manager.BatchHandler)))
-
 		manager.Serv = &http.Server{
 			Addr:    manager.Address,
 			Handler: router,

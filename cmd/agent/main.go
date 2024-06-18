@@ -12,7 +12,7 @@ func main() {
 	ctx, complete := config.CompletionCtx()
 	defer complete()
 
-	agent, err := config.Configure(ctx, &agent.SelfMonitor{}, config.WithEnvCmd)
+	agent, err := config.Configure(ctx, &agent.SelfMonitor{}, config.EnvFlagsAgent)
 	if err != nil {
 		log.Fatal("agent config error", zap.Error(err))
 	}

@@ -13,7 +13,10 @@ func main() {
 	defer complete()
 
 	server, err := config.Configure(ctx, &server.MetricManager{},
-		config.WithEnvCmd, config.WithRoutes, config.WithStorage)
+		config.EnvFlagsServer,
+		config.WithRoutes,
+		config.WithStorage,
+	)
 	if err != nil {
 		log.Fatal("server config error", zap.Error(err))
 	}

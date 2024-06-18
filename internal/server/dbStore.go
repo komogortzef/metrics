@@ -169,6 +169,7 @@ RETURNING *`,
 }
 
 func createTables(ctx context.Context, pool *pgxpool.Pool) error {
+	log.Debug("creating tables if not exists")
 	query :=
 		`CREATE TABLE IF NOT EXISTS metrics(
 	id SERIAL PRIMARY KEY,
@@ -180,6 +181,5 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_metric_delta ON metrics ((data->>'delta
 	if _, err := pool.Exec(ctx, query); err != nil {
 		return fmt.Errorf("couldn't create tables: %w", err)
 	}
-	log.Info("Success creating tables!")
 	return nil
 }
