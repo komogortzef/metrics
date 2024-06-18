@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	log "metrics/internal/logger"
@@ -36,9 +35,6 @@ func getHelper(mtype string) helper {
 
 func processURL(url string) (string, string, string) {
 	strs := strings.Split(url, "/")[2:]
-	for i, val := range strs {
-		fmt.Println(i, ":", val)
-	}
 	switch len(strs) {
 	case 0:
 		return "", "", ""
@@ -51,17 +47,14 @@ func processURL(url string) (string, string, string) {
 }
 
 func dump(ctx context.Context, path string, store Repository) error {
-	log.Info("Dump starts")
+	log.Info("Dump to file...")
 	var buf []byte
-	var mtx sync.RWMutex
 	// объединение всех метрик в один байтовый срез(разделение с помощью '\n'):
-	mtx.RLock()
 	items, _ := store.List(ctx)
 	for _, data := range items {
 		data = append(data, byte('\n'))
 		buf = append(buf, data...)
 	}
-	mtx.RUnlock()
 
 	return os.WriteFile(path, buf, 0666)
 }

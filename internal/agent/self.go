@@ -23,33 +23,49 @@ type SelfMonitor struct {
 	mtx            *sync.RWMutex
 }
 
-func (sm *SelfMonitor) collect() {
+func (sm *SelfMonitor) collect(ctx context.Context) {
 	for {
-		sm.mtx.Lock()
-		runtime.ReadMemStats(&memStats)
-		sm.randVal = rand.Float64()
-		sm.pollCount++
-		sm.collectMetrics()
-		log.Debug("collect", zap.Int64("poll", sm.pollCount))
-		sm.mtx.Unlock()
-		time.Sleep(time.Duration(sm.PollInterval) * time.Second)
+		select {
+		case <-ctx.Done():
+			log.Debug("Goodbye from collect")
+			return
+		default:
+			sm.mtx.Lock()
+			runtime.ReadMemStats(&memStats)
+			sm.randVal = rand.Float64()
+			sm.pollCount++
+			sm.collectMetrics()
+			log.Debug("collect", zap.Int64("poll", sm.pollCount))
+			sm.mtx.Unlock()
+			time.Sleep(time.Duration(sm.PollInterval) * time.Second)
+		}
 	}
 }
 
-func (sm *SelfMonitor) report() {
+func (sm *SelfMonitor) report(ctx context.Context) {
+	attempts := 3
+	initTime := time.Duration(1 * time.Second)
+	delta := time.Duration(2 * time.Second)
 	for {
-	sleep:
-		time.Sleep(time.Duration(sm.ReportInterval) * time.Second)
-		log.Debug("sending...")
-		sm.mtx.RLock()
-		if err := sm.sendBatch(); err != nil {
-			log.Warn("Sending error", zap.Error(err))
+		select {
+		case <-ctx.Done():
+			log.Debug("Goodbye from report")
+			return
+		default:
+			time.Sleep(time.Duration(sm.ReportInterval) * time.Second)
+			log.Debug("sending...")
+			sm.mtx.RLock()
+			if err := sm.sendBatch(); err != nil {
+				if err = retry(attempts, initTime, delta, sm.sendBatch); err != nil {
+					log.Warn("Sending error", zap.Error(err))
+					sm.mtx.RUnlock()
+					continue
+				}
+			}
+			sm.pollCount = 0
 			sm.mtx.RUnlock()
-			goto sleep
+			log.Debug("Success sending!")
 		}
-		sm.pollCount = 0
-		log.Info("Success sending!")
-		sm.mtx.RUnlock()
 	}
 }
 
@@ -58,9 +74,11 @@ func (sm *SelfMonitor) Run(ctx context.Context) {
 		zap.String("addr", sm.Address),
 		zap.Int("poll interval", sm.PollInterval),
 		zap.Int("report interval", sm.ReportInterval))
+
 	sm.mtx = &sync.RWMutex{}
-	go sm.collect()
-	go sm.report()
+	go sm.collect(ctx)
+	go sm.report(ctx)
+
 	<-ctx.Done()
 	log.Debug("Goodbye!")
 }

@@ -91,7 +91,7 @@ func (db *DataBase) List(ctx context.Context) (metrics [][]byte, err error) {
 		metrics = append(metrics, metric)
 	}
 
-	return
+	return metrics, err
 }
 
 func (db *DataBase) insertBatch(ctx context.Context, data []byte) error {

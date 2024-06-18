@@ -131,6 +131,7 @@ func WithStorage(ctx ctx.Context, cfg Config) (err error) {
 			if manager.Store, err = server.NewDB(ctx, manager.DBAddress); err != nil {
 				return err
 			}
+			manager.FileStoragePath = m.NoStorage
 		} else if manager.FileStoragePath != "" {
 			store := server.NewFileStore(manager.FileStoragePath)
 			if manager.StoreInterval > 0 {

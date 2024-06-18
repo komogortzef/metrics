@@ -26,6 +26,7 @@ const (
 	DefaultStorePath      = "/tmp/metrics-db.json"
 	DefaultRestore        = true
 	DefaultSendMode       = "text"
+	NoStorage             = ""
 
 	InternalErrorMsg  = "internal server error"
 	NotFoundMessage   = "not found"

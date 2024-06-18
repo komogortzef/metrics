@@ -54,11 +54,10 @@ func (mm *MetricManager) Run(ctx context.Context) {
 
 	select {
 	case <-ctx.Done():
-		if mm.FileStoragePath == "" {
-			mm.FileStoragePath = m.DefaultStorePath
-		}
-		if err := dump(ctx, mm.FileStoragePath, mm.Store); err != nil {
-			log.Fatal("couldn't dump to file", zap.Error(err))
+		if mm.FileStoragePath != m.NoStorage {
+			if err := dump(ctx, mm.FileStoragePath, mm.Store); err != nil {
+				log.Fatal("couldn't dump to file", zap.Error(err))
+			}
 		}
 		if err := mm.Serv.Shutdown(ctx); err != nil {
 			log.Fatal("server shutdown err", zap.Error(err))
@@ -88,7 +87,6 @@ func (mm *MetricManager) UpdateHandler(rw http.ResponseWriter, req *http.Request
 		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
 		return
 	}
-
 	rw.WriteHeader(http.StatusOK)
 }
 

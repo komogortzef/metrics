@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 
+	log "metrics/internal/logger"
 	m "metrics/internal/models"
 
 	"github.com/tidwall/gjson"
@@ -37,6 +38,7 @@ func (fs *FileStorage) Put(ctx context.Context,
 }
 
 func (fs *FileStorage) RestoreFromFile(ctx context.Context) error {
+	log.Debug("Restore from file...")
 	b, err := os.ReadFile(fs.FilePath)
 	if err != nil {
 		return err
