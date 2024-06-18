@@ -7,7 +7,7 @@ import (
 	"os"
 
 	log "metrics/internal/logger"
-	m "metrics/internal/service"
+	"metrics/internal/service"
 
 	"github.com/tidwall/gjson"
 )
@@ -48,7 +48,7 @@ func (fs *FileStorage) RestoreFromFile(ctx context.Context) error {
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
 		bytes := scanner.Bytes()
-		name := gjson.GetBytes(bytes, m.ID).String()
+		name := gjson.GetBytes(bytes, service.ID).String()
 		_ = fs.MemStorage.Put(ctx, name, bytes) // ошибка не может здесь возникнуть(addCount не задействован)
 	}
 	return err

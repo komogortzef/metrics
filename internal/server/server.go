@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	log "metrics/internal/logger"
-	m "metrics/internal/service"
+	"metrics/internal/service"
 
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
@@ -36,29 +36,33 @@ func (mm *MetricManager) Run(ctx context.Context) {
 		zap.String("addr", mm.Address),
 		zap.Int("store interval", mm.StoreInterval),
 		zap.Bool("restore", mm.Restore),
-		zap.String("file store path", mm.FileStoragePath),
-		zap.String("data base config", mm.DBAddress))
+		zap.String("file store", mm.FileStoragePath),
+		zap.String("database", mm.DBAddress))
 
 	errChan := make(chan error, 1)
 	go func() {
-		err := m.Retry(ctx, mm.Serv.ListenAndServe)
+		err := mm.Serv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			log.Warn("err in gorutine", zap.Error(err))
 			errChan <- err
 		}
 		close(errChan)
 	}()
 
-	if mm.StoreInterval > 0 && mm.FileStoragePath != m.NoStorage {
+	if mm.StoreInterval > 0 && mm.FileStoragePath != service.NoStorage {
 		dumpWait(ctx, mm.Store, mm.FileStoragePath, mm.StoreInterval)
 	}
 
 	select {
 	case <-ctx.Done():
-		if mm.FileStoragePath != m.NoStorage {
+		if mm.FileStoragePath != service.NoStorage {
 			if err := dump(ctx, mm.FileStoragePath, mm.Store); err != nil {
 				log.Fatal("couldn't dump to file", zap.Error(err))
 			}
+		}
+		if mm.DBAddress != service.NoStorage {
+			db := mm.Store.(*DataBase)
+			db.Close()
+			log.Debug("DB closed")
 		}
 		if err := mm.Serv.Shutdown(ctx); err != nil {
 			log.Fatal("server shutdown err", zap.Error(err))
@@ -71,21 +75,21 @@ func (mm *MetricManager) Run(ctx context.Context) {
 
 func (mm *MetricManager) UpdateHandler(rw http.ResponseWriter, req *http.Request) {
 	mtype, name, value := processURL(req.URL.Path)
-	metric, err := m.NewMetric(mtype, name, value)
+	metric, err := service.NewMetric(mtype, name, value)
 	if err != nil {
 		log.Warn("NewMetric error", zap.Error(err))
-		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
+		http.Error(rw, service.BadRequestMessage, http.StatusBadRequest)
 		return
 	}
 	bytes, err := metric.MarshalJSON()
 	if err != nil {
 		log.Warn("UpdateHandler(): marshal error", zap.Error(err))
-		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
+		http.Error(rw, service.InternalErrorMsg, http.StatusInternalServerError)
 		return
 	}
 	if err = mm.Store.Put(req.Context(), name, bytes, getHelper(mtype)); err != nil {
 		log.Warn("UpdateHandler(): storage error", zap.Error(err))
-		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
+		http.Error(rw, service.InternalErrorMsg, http.StatusInternalServerError)
 		return
 	}
 	rw.WriteHeader(http.StatusOK)
@@ -96,15 +100,15 @@ func (mm *MetricManager) GetHandler(rw http.ResponseWriter, req *http.Request) {
 	newBytes, err := mm.Store.Get(req.Context(), name)
 	if err != nil {
 		log.Warn("GetHandler(): Coundn't fetch the metric from store", zap.Error(err))
-		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
+		http.Error(rw, service.NotFoundMessage, http.StatusNotFound)
 		return
 	}
 	var numStr string
-	if mtype == m.Counter {
-		numBytes := gjson.GetBytes(newBytes, m.Delta)
+	if mtype == service.Counter {
+		numBytes := gjson.GetBytes(newBytes, service.Delta)
 		numStr = strconv.FormatInt(numBytes.Int(), 10)
 	} else {
-		numBytes := gjson.GetBytes(newBytes, m.Value)
+		numBytes := gjson.GetBytes(newBytes, service.Value)
 		numStr = strconv.FormatFloat(numBytes.Float(), 'f', -1, 64)
 	}
 
@@ -113,9 +117,9 @@ func (mm *MetricManager) GetHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (mm *MetricManager) GetAllHandler(rw http.ResponseWriter, req *http.Request) {
-	list := make([]Item, 0, m.MetricsNumber)
+	list := make([]Item, 0, service.MetricsNumber)
 
-	var metric m.Metrics
+	var metric service.Metrics
 	metrics, _ := mm.Store.List(req.Context())
 	for _, bytes := range metrics {
 		_ = metric.UnmarshalJSON(bytes)
@@ -124,7 +128,7 @@ func (mm *MetricManager) GetAllHandler(rw http.ResponseWriter, req *http.Request
 	html, err := renderGetAll(list)
 	if err != nil {
 		log.Warn("GetAllHandler(): An error occured during html rendering")
-		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
+		http.Error(rw, service.InternalErrorMsg, http.StatusInternalServerError)
 		return
 	}
 
@@ -140,16 +144,16 @@ func (mm *MetricManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) {
 	}
 	defer req.Body.Close()
 
-	name := gjson.GetBytes(bytes, m.ID).String()
-	mtype := gjson.GetBytes(bytes, m.Mtype).String()
+	name := gjson.GetBytes(bytes, service.ID).String()
+	mtype := gjson.GetBytes(bytes, service.Mtype).String()
 	if err = mm.Store.Put(req.Context(), name, bytes, getHelper(mtype)); err != nil {
 		log.Warn("UpdateJSON(): couldn't write to store", zap.Error(err))
-		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
+		http.Error(rw, service.InternalErrorMsg, http.StatusInternalServerError)
 		return
 	}
 	newBytes := bytes
-	if mtype == m.Counter {
-		name := gjson.GetBytes(bytes, m.Delta).String()
+	if mtype == service.Counter {
+		name := gjson.GetBytes(bytes, service.Delta).String()
 		newBytes, _ = mm.Store.Get(req.Context(), name)
 	}
 
@@ -161,16 +165,16 @@ func (mm *MetricManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 	bytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		log.Warn("GetJSON(): Couldn't read request body")
-		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
+		http.Error(rw, service.BadRequestMessage, http.StatusBadRequest)
 		return
 	}
 	defer req.Body.Close()
 
-	name := gjson.GetBytes(bytes, m.ID).String()
+	name := gjson.GetBytes(bytes, service.ID).String()
 	log.Info("needed metric name", zap.String("name", name))
 	if bytes, err = mm.Store.Get(req.Context(), name); err != nil {
 		log.Warn("GetJSON(): No such metric in store", zap.Error(err))
-		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
+		http.Error(rw, service.NotFoundMessage, http.StatusNotFound)
 		return
 	}
 
@@ -183,12 +187,12 @@ func (mm *MetricManager) PingHandler(rw http.ResponseWriter, req *http.Request) 
 	db, ok := mm.Store.(*DataBase)
 	if !ok {
 		log.Warn("PingHandler(): Invalid storage type for ping")
-		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
+		http.Error(rw, service.InternalErrorMsg, http.StatusInternalServerError)
 		return
 	}
 	if err := db.Ping(req.Context()); err != nil {
 		log.Warn("PingHandler(): There is no connection to data base")
-		http.Error(rw, m.InternalErrorMsg, http.StatusInternalServerError)
+		http.Error(rw, service.InternalErrorMsg, http.StatusInternalServerError)
 		return
 	}
 
@@ -200,7 +204,7 @@ func (mm *MetricManager) BatchHandler(rw http.ResponseWriter, req *http.Request)
 	b, err := io.ReadAll(req.Body)
 	if err != nil {
 		log.Warn("UpdatesJSON(): Couldn't read request body")
-		http.Error(rw, m.BadRequestMessage, http.StatusBadRequest)
+		http.Error(rw, service.BadRequestMessage, http.StatusBadRequest)
 		return
 	}
 	defer req.Body.Close()
@@ -208,12 +212,12 @@ func (mm *MetricManager) BatchHandler(rw http.ResponseWriter, req *http.Request)
 	if db, ok := mm.Store.(*DataBase); ok {
 		if err = db.insertBatch(req.Context(), b); err != nil {
 			log.Warn("UpdatesJSON(): couldn't send the batch", zap.Error(err))
-			http.Error(rw, m.InternalErrorMsg, http.StatusBadRequest)
+			http.Error(rw, service.InternalErrorMsg, http.StatusBadRequest)
 		}
 	} else {
 		gjson.ParseBytes(b).ForEach(func(key, value gjson.Result) bool {
-			name := value.Get(m.ID).String()
-			mtype := value.Get(m.Mtype).String()
+			name := value.Get(service.ID).String()
+			mtype := value.Get(service.Mtype).String()
 			_ = mm.Store.Put(req.Context(), name, []byte(value.Raw), getHelper(mtype))
 			return true
 		})

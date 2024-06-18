@@ -8,13 +8,13 @@ import (
 	"time"
 
 	log "metrics/internal/logger"
-	m "metrics/internal/service"
+	"metrics/internal/service"
 
 	"go.uber.org/zap"
 )
 
 type SelfMonitor struct {
-	metrics        []m.Metrics
+	metrics        []service.Metrics
 	randVal        float64
 	pollCount      int64
 	Address        string `env:"ADDRESS" envDefault:"none"`
@@ -52,7 +52,7 @@ func (sm *SelfMonitor) report(ctx context.Context) {
 			time.Sleep(time.Duration(sm.ReportInterval) * time.Second)
 			log.Debug("sending...")
 			sm.mtx.RLock()
-			if err := m.Retry(ctx, sm.sendBatch); err != nil {
+			if err := service.Retry(ctx, sm.sendBatch); err != nil {
 				log.Warn("Sending error", zap.Error(err))
 				sm.mtx.RUnlock()
 				continue

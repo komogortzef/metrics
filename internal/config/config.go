@@ -13,7 +13,7 @@ import (
 	c "metrics/internal/compress"
 	log "metrics/internal/logger"
 	"metrics/internal/server"
-	m "metrics/internal/service"
+	"metrics/internal/service"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/go-chi/chi/v5"
@@ -56,9 +56,9 @@ func EnvFlagsAgent(_ ctx.Context, cfg Config) (err error) {
 		return fmt.Errorf("env parse error: %w", err)
 	}
 	if agent, ok := cfg.(*agent.SelfMonitor); ok {
-		addr := flag.String("a", m.DefaultEndpoint, "Endpoint arg: -a <host:port>")
-		poll := flag.Int("p", m.DefaultPollInterval, "Poll Interval arg: -p <sec>")
-		rep := flag.Int("r", m.DefaultReportInterval, "Report interval arg: -r <sec>")
+		addr := flag.String("a", service.DefaultEndpoint, "Endpoint arg: -a <host:port>")
+		poll := flag.Int("p", service.DefaultPollInterval, "Poll Interval arg: -p <sec>")
+		rep := flag.Int("r", service.DefaultReportInterval, "Report interval arg: -r <sec>")
 		flag.Parse()
 		if agent.Address == "none" {
 			agent.Address = *addr
@@ -79,11 +79,11 @@ func EnvFlagsServer(_ ctx.Context, cfg Config) (err error) {
 		return fmt.Errorf("env parse error: %w", err)
 	}
 	if server, ok := cfg.(*server.MetricManager); ok {
-		addr := flag.String("a", m.DefaultEndpoint, "Endpoint arg: -a <host:port>")
-		storeInterv := flag.Int("i", m.DefaultStoreInterval, "Store interval arg: -i <sec>")
-		filePath := flag.String("f", m.DefaultStorePath, "File path arg: -f </path/to/file>")
-		rest := flag.Bool("r", m.DefaultRestore, "Restore storage arg: -r <true|false>")
-		dbAddr := flag.String("d", m.NoStorage, "DB address arg: -d <dbserver://username:password@host:port/db_name>")
+		addr := flag.String("a", service.DefaultEndpoint, "Endpoint arg: -a <host:port>")
+		storeInterv := flag.Int("i", service.DefaultStoreInterval, "Store interval arg: -i <sec>")
+		filePath := flag.String("f", service.DefaultStorePath, "File path arg: -f </path/to/file>")
+		rest := flag.Bool("r", service.DefaultRestore, "Restore storage arg: -r <true|false>")
+		dbAddr := flag.String("d", service.NoStorage, "DB address arg: -d <dbserver://username:password@host:port/db_name>")
 		flag.Parse()
 		if server.Address == "none" {
 			server.Address = *addr
@@ -137,7 +137,7 @@ func WithStorage(ctx ctx.Context, cfg Config) (err error) {
 			if manager.Store, err = server.NewDB(ctx, manager.DBAddress); err != nil {
 				return err
 			}
-			manager.FileStoragePath = m.NoStorage
+			manager.FileStoragePath = service.NoStorage
 		} else if manager.FileStoragePath != "" {
 			store := server.NewFileStore(manager.FileStoragePath)
 			if manager.StoreInterval > 0 {

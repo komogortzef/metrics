@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	log "metrics/internal/logger"
-	m "metrics/internal/service"
+	"metrics/internal/service"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -45,7 +45,7 @@ func NewDB(ctx context.Context, addr string) (*DataBase, error) {
 
 func (db *DataBase) Put(ctx context.Context, _ string, data []byte, _ ...helper) error {
 	log.Debug("DB Put ...")
-	return m.Retry(ctx, func() error {
+	return service.Retry(ctx, func() error {
 		conn, err := db.Acquire(ctx)
 		if err != nil {
 			return err
@@ -53,7 +53,7 @@ func (db *DataBase) Put(ctx context.Context, _ string, data []byte, _ ...helper)
 		defer conn.Release()
 
 		queryName := gaugeQuery
-		if gjson.GetBytes(data, "type").String() == m.Counter {
+		if gjson.GetBytes(data, "type").String() == service.Counter {
 			queryName = counterQuery
 		}
 		_, err = conn.Exec(ctx, queryName, data)
@@ -65,7 +65,7 @@ func (db *DataBase) Get(ctx context.Context, key string) ([]byte, error) {
 	log.Info("DB Get...")
 
 	var data []byte
-	err := m.Retry(ctx, func() error {
+	err := service.Retry(ctx, func() error {
 		conn, err := db.Acquire(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to acquire: %w", err)
@@ -84,7 +84,7 @@ func (db *DataBase) Get(ctx context.Context, key string) ([]byte, error) {
 
 func (db *DataBase) List(ctx context.Context) (metrics [][]byte, err error) {
 	log.Info("DB List...")
-	err = m.Retry(ctx, func() error {
+	err = service.Retry(ctx, func() error {
 		conn, err := db.Acquire(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to acquire: %w", err)
@@ -110,7 +110,7 @@ func (db *DataBase) List(ctx context.Context) (metrics [][]byte, err error) {
 
 func (db *DataBase) insertBatch(ctx context.Context, data []byte) error {
 	log.Info("batch sending...")
-	return m.Retry(ctx, func() error {
+	return service.Retry(ctx, func() error {
 		conn, err := db.Acquire(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to acquire connection: %w", err)
@@ -126,7 +126,7 @@ func (db *DataBase) insertBatch(ctx context.Context, data []byte) error {
 		batch := &pgx.Batch{}
 		gjson.ParseBytes(data).ForEach(func(key, value gjson.Result) bool {
 			queryName := gaugeQuery
-			if value.Get(m.Mtype).String() == m.Counter {
+			if value.Get(service.Mtype).String() == service.Counter {
 				queryName = counterQuery
 			}
 			batch.Queue(queryName, []byte(value.Raw))

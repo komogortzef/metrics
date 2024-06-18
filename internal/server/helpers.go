@@ -8,17 +8,17 @@ import (
 	"time"
 
 	log "metrics/internal/logger"
-	m "metrics/internal/service"
+	"metrics/internal/service"
 
 	"github.com/tidwall/gjson"
 )
 
 func addCounter(old []byte, input []byte) ([]byte, error) {
-	var oldStruct m.Metrics
+	var oldStruct service.Metrics
 	if err := oldStruct.UnmarshalJSON(old); err != nil {
 		return nil, fmt.Errorf("addCounter(): unmarshal error: %w", err)
 	}
-	num := gjson.GetBytes(input, m.Delta).Int()
+	num := gjson.GetBytes(input, service.Delta).Int()
 	*oldStruct.Delta += num
 
 	return oldStruct.MarshalJSON()
@@ -26,7 +26,7 @@ func addCounter(old []byte, input []byte) ([]byte, error) {
 
 func getHelper(mtype string) helper {
 	switch mtype {
-	case m.Counter:
+	case service.Counter:
 		return addCounter
 	default:
 		return nil
