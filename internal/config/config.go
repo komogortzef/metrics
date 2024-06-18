@@ -12,8 +12,8 @@ import (
 	"metrics/internal/agent"
 	c "metrics/internal/compress"
 	log "metrics/internal/logger"
-	m "metrics/internal/models"
 	"metrics/internal/server"
+	m "metrics/internal/service"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/go-chi/chi/v5"

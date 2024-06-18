@@ -1,19 +1,16 @@
-package models
+package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
-)
+	"time"
 
-//go:generate ffjson $GOFILE
-type Metrics struct {
-	ID    string   `json:"id"`
-	MType string   `json:"type"`
-	Delta *int64   `json:"delta,omitempty"`
-	Value *float64 `json:"value,omitempty"`
-}
-type SliceMetrics = []Metrics
+	log "metrics/internal/logger"
+
+	"github.com/cenkalti/backoff/v4"
+)
 
 // часто используемые строковые литералы в виде констант
 const (
@@ -44,6 +41,14 @@ var (
 	ErrInvalidVal  = errors.New("invalid metric value")
 	ErrInvalidType = errors.New("invalid metric type")
 )
+
+//go:generate ffjson $GOFILE
+type Metrics struct {
+	ID    string   `json:"id"`
+	MType string   `json:"type"`
+	Delta *int64   `json:"delta,omitempty"`
+	Value *float64 `json:"value,omitempty"`
+}
 
 // сборка метрики для сервера
 func NewMetric(mtype, id string, val any) (Metrics, error) {
@@ -93,13 +98,6 @@ func BuildMetric(name string, val any) Metrics {
 	return metric
 }
 
-func (met *Metrics) Data() any {
-	if met.MType == Counter {
-		return *met.Delta
-	}
-	return *met.Value
-}
-
 func (met *Metrics) String() string {
 	if met.Delta == nil && met.Value == nil {
 		return fmt.Sprintf(" %s: <empty>", met.ID)
@@ -108,4 +106,15 @@ func (met *Metrics) String() string {
 		return fmt.Sprintf(" %s: %d", met.ID, *met.Delta)
 	}
 	return fmt.Sprintf(" %s: %g", met.ID, *met.Value)
+}
+
+func Retry(ctx context.Context, fn func() error) error {
+	log.Debug("Retry...")
+	expBackoff := backoff.NewExponentialBackOff()
+	expBackoff.InitialInterval = 333 * time.Millisecond
+	expBackoff.Multiplier = 3
+	expBackoff.MaxInterval = 5 * time.Second
+	expBackoff.MaxElapsedTime = 15 * time.Second
+
+	return backoff.Retry(fn, backoff.WithContext(expBackoff, ctx))
 }

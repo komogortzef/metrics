@@ -4,14 +4,11 @@ import (
 	"bytes"
 	"net/http"
 	"runtime"
-	"time"
 
 	c "metrics/internal/compress"
-	log "metrics/internal/logger"
-	m "metrics/internal/models"
+	m "metrics/internal/service"
 
 	"github.com/pquerna/ffjson/ffjson"
-	"go.uber.org/zap"
 )
 
 var memStats = runtime.MemStats{}
@@ -66,18 +63,6 @@ func (sm *SelfMonitor) sendBatch() error {
 	r, err := http.DefaultClient.Do(req)
 	if r != nil && r.Body != nil {
 		r.Body.Close()
-	}
-	return err
-}
-
-func retry(attempts int, sleep, delta time.Duration, fn func() error) (err error) {
-	for i := 0; i < attempts; i++ {
-		log.Debug("retry", zap.Int("attempt", i+1), zap.Duration("waiting time", sleep))
-		time.Sleep(sleep)
-		if err = fn(); err == nil {
-			return nil
-		}
-		sleep += delta
 	}
 	return err
 }

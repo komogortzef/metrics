@@ -8,7 +8,7 @@ import (
 	"time"
 
 	log "metrics/internal/logger"
-	m "metrics/internal/models"
+	m "metrics/internal/service"
 
 	"go.uber.org/zap"
 )
@@ -43,9 +43,6 @@ func (sm *SelfMonitor) collect(ctx context.Context) {
 }
 
 func (sm *SelfMonitor) report(ctx context.Context) {
-	attempts := 3
-	initTime := time.Duration(1 * time.Second)
-	delta := time.Duration(2 * time.Second)
 	for {
 		select {
 		case <-ctx.Done():
@@ -55,12 +52,10 @@ func (sm *SelfMonitor) report(ctx context.Context) {
 			time.Sleep(time.Duration(sm.ReportInterval) * time.Second)
 			log.Debug("sending...")
 			sm.mtx.RLock()
-			if err := sm.sendBatch(); err != nil {
-				if err = retry(attempts, initTime, delta, sm.sendBatch); err != nil {
-					log.Warn("Sending error", zap.Error(err))
-					sm.mtx.RUnlock()
-					continue
-				}
+			if err := m.Retry(ctx, sm.sendBatch); err != nil {
+				log.Warn("Sending error", zap.Error(err))
+				sm.mtx.RUnlock()
+				continue
 			}
 			sm.pollCount = 0
 			sm.mtx.RUnlock()

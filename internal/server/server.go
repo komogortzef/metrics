@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	log "metrics/internal/logger"
-	m "metrics/internal/models"
+	m "metrics/internal/service"
 
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
@@ -41,8 +41,9 @@ func (mm *MetricManager) Run(ctx context.Context) {
 
 	errChan := make(chan error, 1)
 	go func() {
-		err := mm.Serv.ListenAndServe()
+		err := m.Retry(ctx, mm.Serv.ListenAndServe)
 		if err != nil && err != http.ErrServerClosed {
+			log.Warn("err in gorutine", zap.Error(err))
 			errChan <- err
 		}
 		close(errChan)
@@ -94,7 +95,7 @@ func (mm *MetricManager) GetHandler(rw http.ResponseWriter, req *http.Request) {
 	mtype, name, _ := processURL(req.URL.Path)
 	newBytes, err := mm.Store.Get(req.Context(), name)
 	if err != nil {
-		log.Warn("GetHandler(): Coundn't fetch the metric from store")
+		log.Warn("GetHandler(): Coundn't fetch the metric from store", zap.Error(err))
 		http.Error(rw, m.NotFoundMessage, http.StatusNotFound)
 		return
 	}

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	log "metrics/internal/logger"
-	m "metrics/internal/models"
+	m "metrics/internal/service"
 
 	"github.com/tidwall/gjson"
 )

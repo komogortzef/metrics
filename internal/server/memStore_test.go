@@ -4,7 +4,7 @@ import (
 	"log"
 	"testing"
 
-	m "metrics/internal/models"
+	m "metrics/internal/service"
 )
 
 func TestWrite(t *testing.T) {
