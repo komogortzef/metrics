@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"runtime"
 
-	c "metrics/internal/compress"
-	"metrics/internal/service"
+	"metrics/internal/compress"
+	s "metrics/internal/service"
 
 	"github.com/pquerna/ffjson/ffjson"
 )
@@ -14,36 +14,36 @@ import (
 var memStats = runtime.MemStats{}
 
 func (sm *SelfMonitor) collectMetrics() {
-	sm.metrics = []service.Metrics{
-		service.BuildMetric("Alloc", float64(memStats.Alloc)),
-		service.BuildMetric("BuckHashSys", float64(memStats.BuckHashSys)),
-		service.BuildMetric("Frees", float64(memStats.Frees)),
-		service.BuildMetric("GCCPUFraction", memStats.GCCPUFraction),
-		service.BuildMetric("GCSys", float64(memStats.GCSys)),
-		service.BuildMetric("HeapAlloc", float64(memStats.HeapAlloc)),
-		service.BuildMetric("HeapIdle", float64(memStats.HeapIdle)),
-		service.BuildMetric("HeapInuse", float64(memStats.HeapInuse)),
-		service.BuildMetric("HeapObjects", float64(memStats.HeapObjects)),
-		service.BuildMetric("HeapReleased", float64(memStats.HeapReleased)),
-		service.BuildMetric("HeapSys", float64(memStats.HeapSys)),
-		service.BuildMetric("LastGC", float64(memStats.LastGC)),
-		service.BuildMetric("Lookups", float64(memStats.Lookups)),
-		service.BuildMetric("MCacheInuse", float64(memStats.MCacheInuse)),
-		service.BuildMetric("MCacheSys", float64(memStats.MCacheSys)),
-		service.BuildMetric("MSpanInuse", float64(memStats.MSpanInuse)),
-		service.BuildMetric("MSpanSys", float64(memStats.MSpanSys)),
-		service.BuildMetric("Mallocs", float64(memStats.Mallocs)),
-		service.BuildMetric("NextGC", float64(memStats.NextGC)),
-		service.BuildMetric("NumForcedGC", float64(memStats.NumForcedGC)),
-		service.BuildMetric("NumGC", float64(memStats.NumGC)),
-		service.BuildMetric("OtherSys", float64(memStats.OtherSys)),
-		service.BuildMetric("PauseTotalNs", float64(memStats.PauseTotalNs)),
-		service.BuildMetric("StackInuse", float64(memStats.StackInuse)),
-		service.BuildMetric("StackSys", float64(memStats.StackSys)),
-		service.BuildMetric("Sys", float64(memStats.Sys)),
-		service.BuildMetric("TotalAlloc", float64(memStats.TotalAlloc)),
-		service.BuildMetric("RandomValue", sm.randVal),
-		service.BuildMetric("PollCount", sm.pollCount),
+	sm.metrics = []s.Metrics{
+		s.BuildMetric("Alloc", float64(memStats.Alloc)),
+		s.BuildMetric("BuckHashSys", float64(memStats.BuckHashSys)),
+		s.BuildMetric("Frees", float64(memStats.Frees)),
+		s.BuildMetric("GCCPUFraction", memStats.GCCPUFraction),
+		s.BuildMetric("GCSys", float64(memStats.GCSys)),
+		s.BuildMetric("HeapAlloc", float64(memStats.HeapAlloc)),
+		s.BuildMetric("HeapIdle", float64(memStats.HeapIdle)),
+		s.BuildMetric("HeapInuse", float64(memStats.HeapInuse)),
+		s.BuildMetric("HeapObjects", float64(memStats.HeapObjects)),
+		s.BuildMetric("HeapReleased", float64(memStats.HeapReleased)),
+		s.BuildMetric("HeapSys", float64(memStats.HeapSys)),
+		s.BuildMetric("LastGC", float64(memStats.LastGC)),
+		s.BuildMetric("Lookups", float64(memStats.Lookups)),
+		s.BuildMetric("MCacheInuse", float64(memStats.MCacheInuse)),
+		s.BuildMetric("MCacheSys", float64(memStats.MCacheSys)),
+		s.BuildMetric("MSpanInuse", float64(memStats.MSpanInuse)),
+		s.BuildMetric("MSpanSys", float64(memStats.MSpanSys)),
+		s.BuildMetric("Mallocs", float64(memStats.Mallocs)),
+		s.BuildMetric("NextGC", float64(memStats.NextGC)),
+		s.BuildMetric("NumForcedGC", float64(memStats.NumForcedGC)),
+		s.BuildMetric("NumGC", float64(memStats.NumGC)),
+		s.BuildMetric("OtherSys", float64(memStats.OtherSys)),
+		s.BuildMetric("PauseTotalNs", float64(memStats.PauseTotalNs)),
+		s.BuildMetric("StackInuse", float64(memStats.StackInuse)),
+		s.BuildMetric("StackSys", float64(memStats.StackSys)),
+		s.BuildMetric("Sys", float64(memStats.Sys)),
+		s.BuildMetric("TotalAlloc", float64(memStats.TotalAlloc)),
+		s.BuildMetric("RandomValue", sm.randVal),
+		s.BuildMetric("PollCount", sm.pollCount),
 	}
 }
 
@@ -53,16 +53,19 @@ func (sm *SelfMonitor) sendBatch() error {
 	if err != nil {
 		return err
 	}
-	compressData, err := c.Compress(data)
+	compressData, err := compress.Compress(data)
 	if err != nil {
 		return err
 	}
+
 	req, _ := http.NewRequest(http.MethodPost, url, bytes.NewReader(compressData))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
 	r, err := http.DefaultClient.Do(req)
+
 	if r != nil && r.Body != nil {
 		r.Body.Close()
 	}
+
 	return err
 }

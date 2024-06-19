@@ -2,7 +2,7 @@ package main
 
 import (
 	"metrics/internal/config"
-	log "metrics/internal/logger"
+	"metrics/internal/logger"
 	"metrics/internal/server"
 
 	"go.uber.org/zap"
@@ -18,7 +18,7 @@ func main() {
 		config.WithStorage,
 	)
 	if err != nil {
-		log.Fatal("server config error", zap.Error(err))
+		logger.Fatal("server config error", zap.Error(err))
 	}
 
 	server.Run(ctx)

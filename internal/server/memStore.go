@@ -1,64 +1,57 @@
 package server
 
 import (
-	"context"
+	ctx "context"
 	"errors"
 	"sync"
+
+	s "metrics/internal/service"
 )
 
-const (
-	metricsNumber = 29
-)
+const metricsNumber = 29
+
+var ErrNoValue = errors.New("no such value in storage")
 
 type MemStorage struct {
-	items map[string][]byte
+	items map[string]s.Metrics
 	len   int
 	mtx   *sync.RWMutex
 }
 
 func NewMemStore() *MemStorage {
 	return &MemStorage{
-		items: make(map[string][]byte, metricsNumber),
+		items: make(map[string]s.Metrics, metricsNumber),
 		mtx:   &sync.RWMutex{},
 	}
 }
 
-func (ms *MemStorage) Put(ctx context.Context,
-	name string, input []byte, helps ...helper) error {
-	var err error
+func (ms *MemStorage) Put(_ ctx.Context, met s.Metrics) (s.Metrics, error) {
 	ms.mtx.Lock()
-	old, exists := ms.items[name]
-	for _, helper := range helps {
-		if helper != nil && exists {
-			if input, err = helper(old, input); err != nil {
-				return err
-			}
-		}
-	}
-	ms.items[name] = input
+	oldMet, exists := ms.items[met.ID]
+	met.MergeMetrics(oldMet)
+	ms.items[met.ID] = met
 	if !exists {
 		ms.len++
 	}
 	ms.mtx.Unlock()
-	return err
+	return met, nil
 }
 
-func (ms *MemStorage) Get(ctx context.Context, name string) ([]byte, error) {
+func (ms *MemStorage) Get(_ ctx.Context, m s.Metrics) (s.Metrics, error) {
 	var err error
 	ms.mtx.RLock()
-	data, ok := ms.items[name]
+	met, ok := ms.items[m.ID]
 	ms.mtx.RUnlock()
 	if !ok {
-		err = errors.New("no such metric")
+		err = ErrNoValue
 	}
-
-	return data, err
+	return met, err
 }
 
-func (ms *MemStorage) List(ctx context.Context) ([][]byte, error) {
+func (ms *MemStorage) List(ctx ctx.Context) ([]s.Metrics, error) {
 	i := 0
 	ms.mtx.RLock()
-	metrics := make([][]byte, ms.len)
+	metrics := make([]s.Metrics, ms.len)
 	for _, met := range ms.items {
 		metrics[i] = met
 		i++

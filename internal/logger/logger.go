@@ -61,7 +61,7 @@ func InitLog() error {
 		return fmt.Errorf("build config for logger error: %w", err)
 	}
 
-	logger.Info("Logger configured and running with Debug level")
+	logger.Debug("Logger configured and running with Debug level")
 	return nil
 }
 

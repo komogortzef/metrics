@@ -1,20 +1,20 @@
 package agent
 
 import (
-	"context"
+	ctx "context"
 	"math/rand"
 	"runtime"
 	"sync"
 	"time"
 
 	log "metrics/internal/logger"
-	"metrics/internal/service"
+	s "metrics/internal/service"
 
 	"go.uber.org/zap"
 )
 
 type SelfMonitor struct {
-	metrics        []service.Metrics
+	metrics        []s.Metrics
 	randVal        float64
 	pollCount      int64
 	Address        string `env:"ADDRESS" envDefault:"none"`
@@ -23,7 +23,7 @@ type SelfMonitor struct {
 	mtx            *sync.RWMutex
 }
 
-func (sm *SelfMonitor) collect(ctx context.Context) {
+func (sm *SelfMonitor) collect(ctx ctx.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -42,7 +42,7 @@ func (sm *SelfMonitor) collect(ctx context.Context) {
 	}
 }
 
-func (sm *SelfMonitor) report(ctx context.Context) {
+func (sm *SelfMonitor) report(ctx ctx.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -52,7 +52,7 @@ func (sm *SelfMonitor) report(ctx context.Context) {
 			time.Sleep(time.Duration(sm.ReportInterval) * time.Second)
 			log.Debug("sending...")
 			sm.mtx.RLock()
-			if err := service.Retry(ctx, sm.sendBatch); err != nil {
+			if err := s.Retry(ctx, sm.sendBatch); err != nil {
 				log.Warn("Sending error", zap.Error(err))
 				sm.mtx.RUnlock()
 				continue
@@ -64,12 +64,11 @@ func (sm *SelfMonitor) report(ctx context.Context) {
 	}
 }
 
-func (sm *SelfMonitor) Run(ctx context.Context) {
+func (sm *SelfMonitor) Run(ctx ctx.Context) {
 	log.Info("Agent configuration",
 		zap.String("addr", sm.Address),
 		zap.Int("poll interval", sm.PollInterval),
 		zap.Int("report interval", sm.ReportInterval))
-
 	sm.mtx = &sync.RWMutex{}
 	go sm.collect(ctx)
 	go sm.report(ctx)

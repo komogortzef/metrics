@@ -1,7 +1,7 @@
 package service
 
 import (
-	"context"
+	ctx "context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -14,8 +14,6 @@ import (
 
 // часто используемые строковые литералы в виде констант
 const (
-	MetricsNumber = 29
-
 	DefaultEndpoint       = "localhost:8080"
 	DefaultPollInterval   = 2
 	DefaultReportInterval = 10
@@ -51,34 +49,26 @@ type Metrics struct {
 }
 
 // сборка метрики для сервера
-func NewMetric(mtype, id string, val any) (Metrics, error) {
+func NewMetric(mtype, id string, val string) (Metrics, error) {
 	var metric Metrics
 	if mtype != Counter && mtype != Gauge {
 		return metric, ErrInvalidType
 	}
 	metric.MType = mtype
 	metric.ID = id
-	switch v := val.(type) {
-	case int64:
-		metric.Delta = &v
-	case float64:
-		metric.Value = &v
-	case string:
-		if mtype == Counter {
-			num, err := strconv.ParseInt(v, 10, 64)
-			if err != nil {
-				return metric, ErrInvalidVal
-			}
-			metric.Delta = &num
-		} else {
-			num, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				return metric, ErrInvalidVal
-			}
-			metric.Value = &num
+	if mtype == Counter {
+		num, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return metric, ErrInvalidVal
 		}
+		metric.Delta = &num
+	} else {
+		num, err := strconv.ParseFloat(val, 64)
+		if err != nil {
+			return metric, ErrInvalidVal
+		}
+		metric.Value = &num
 	}
-
 	return metric, nil
 }
 
@@ -98,23 +88,41 @@ func BuildMetric(name string, val any) Metrics {
 	return metric
 }
 
-func (met *Metrics) String() string {
+func (met Metrics) String() string {
 	if met.Delta == nil && met.Value == nil {
-		return fmt.Sprintf(" %s: <empty>", met.ID)
+		return fmt.Sprintf(" (%s: <empty>)", met.ID)
 	}
 	if met.MType == Counter {
-		return fmt.Sprintf(" %s: %d", met.ID, *met.Delta)
+		return fmt.Sprintf(" (%s: %d)", met.ID, *met.Delta)
 	}
-	return fmt.Sprintf(" %s: %g", met.ID, *met.Value)
+	return fmt.Sprintf(" (%s: %g)", met.ID, *met.Value)
 }
 
-func Retry(ctx context.Context, fn func() error) error {
+func (met *Metrics) MergeMetrics(met2 Metrics) {
+	if met2.MType == Counter {
+		if met2.Delta == nil {
+			return
+		}
+		*met.Delta += *met2.Delta
+		return
+	}
+	met = &met2
+}
+
+func (met Metrics) ToSlice() []any {
+	if met.MType == Counter {
+		return []any{met.ID, *met.Delta}
+	}
+	return []any{met.ID, *met.Value}
+}
+
+func Retry(ctx ctx.Context, fn func() error) error {
 	log.Debug("Retry...")
 	expBackoff := backoff.NewExponentialBackOff()
 	expBackoff.InitialInterval = 333 * time.Millisecond
 	expBackoff.Multiplier = 3
 	expBackoff.MaxInterval = 5 * time.Second
-	expBackoff.MaxElapsedTime = 15 * time.Second
+	expBackoff.MaxElapsedTime = 11 * time.Second
 
 	return backoff.Retry(fn, backoff.WithContext(expBackoff, ctx))
 }
