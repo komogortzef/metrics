@@ -65,10 +65,6 @@ func (sm *SelfMonitor) report(ctx ctx.Context) {
 }
 
 func (sm *SelfMonitor) Run(ctx ctx.Context) {
-	log.Info("Agent configuration",
-		zap.String("addr", sm.Address),
-		zap.Int("poll interval", sm.PollInterval),
-		zap.Int("report interval", sm.ReportInterval))
 	sm.mtx = &sync.RWMutex{}
 	go sm.collect(ctx)
 	go sm.report(ctx)

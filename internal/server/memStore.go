@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 
+	log "metrics/internal/logger"
 	s "metrics/internal/service"
 )
 
@@ -58,4 +59,23 @@ func (ms *MemStorage) List(ctx ctx.Context) ([]s.Metrics, error) {
 	}
 	ms.mtx.RUnlock()
 	return metrics, nil
+}
+
+func (ms *MemStorage) PutBatch(ctx ctx.Context, mets []s.Metrics) error {
+	for _, metric := range mets {
+		if _, err := ms.Put(ctx, metric); err != nil {
+			log.Warn("Mem PutBatch: couldn't insert batch to file or mem store")
+			return err
+		}
+	}
+	return nil
+}
+
+func (ms *MemStorage) Ping(_ ctx.Context) error {
+	log.Info("Memory storage is working...")
+	return nil
+}
+
+func (ms *MemStorage) Close() {
+	log.Info("Memory storage is closed")
 }

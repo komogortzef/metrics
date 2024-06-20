@@ -132,7 +132,7 @@ func (db *DataBase) List(ctx ctx.Context) (metrics []s.Metrics, err error) {
 	return metrics, err
 }
 
-func (db *DataBase) insertBatch(ctx ctx.Context, mets []s.Metrics) error {
+func (db *DataBase) PutBatch(ctx ctx.Context, mets []s.Metrics) error {
 	log.Debug("Batch sending...")
 	return s.Retry(ctx, func() error {
 		conn, err := db.Acquire(ctx)
@@ -162,6 +162,20 @@ func (db *DataBase) insertBatch(ctx ctx.Context, mets []s.Metrics) error {
 		}
 		return nil
 	})
+}
+
+func (db *DataBase) Ping(ctx ctx.Context) error {
+	if err := db.Pool.Ping(ctx); err != nil {
+		log.Warn("PingHandler(): There is no connection to data base")
+		return err
+	}
+	log.Info("DataBase storage is working")
+	return nil
+}
+
+func (db *DataBase) Close() {
+	db.Pool.Close()
+	log.Info("DataBase connection is closed")
 }
 
 func prepareQueries(ctx ctx.Context, pool *pgxpool.Pool) error {

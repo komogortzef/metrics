@@ -13,12 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-type Storage interface {
-	Put(ctx.Context, s.Metrics) (s.Metrics, error)
-	Get(ctx.Context, s.Metrics) (s.Metrics, error)
-	List(ctx.Context) ([]s.Metrics, error)
-}
-
 type MetricManager struct {
 	Serv            *http.Server
 	Store           Storage
@@ -30,13 +24,6 @@ type MetricManager struct {
 }
 
 func (mm *MetricManager) Run(ctx ctx.Context) {
-	log.Info("Metric Manger configuration",
-		zap.String("addr", mm.Address),
-		zap.Int("store interval", mm.StoreInterval),
-		zap.Bool("restore", mm.Restore),
-		zap.String("file store", mm.FileStoragePath),
-		zap.String("database", mm.DBAddress))
-
 	errChan := make(chan error, 1)
 	go func() {
 		err := mm.Serv.ListenAndServe()
@@ -45,23 +32,13 @@ func (mm *MetricManager) Run(ctx ctx.Context) {
 		}
 		close(errChan)
 	}()
-
 	if mm.StoreInterval > 0 && mm.FileStoragePath != s.NoStorage {
 		dumpWait(ctx, mm.Store, mm.FileStoragePath, mm.StoreInterval)
 	}
 
 	select {
 	case <-ctx.Done():
-		if mm.FileStoragePath != s.NoStorage {
-			if err := dump(ctx, mm.FileStoragePath, mm.Store); err != nil {
-				log.Fatal("couldn't dump to file", zap.Error(err))
-			}
-		}
-		if mm.DBAddress != s.NoStorage {
-			db := mm.Store.(*DataBase)
-			db.Close()
-			log.Debug("DB closed")
-		}
+		mm.Store.Close()
 		if err := mm.Serv.Shutdown(ctx); err != nil {
 			log.Fatal("server shutdown err", zap.Error(err))
 		}
@@ -168,14 +145,8 @@ func (mm *MetricManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (mm *MetricManager) PingHandler(rw http.ResponseWriter, req *http.Request) {
-	db, ok := mm.Store.(*DataBase)
-	if !ok {
-		log.Warn("PingHandler(): Invalid storage type for ping")
-		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
-		return
-	}
-	if err := db.Ping(req.Context()); err != nil {
-		log.Warn("PingHandler(): There is no connection to data base")
+	if err := mm.Store.Ping(req.Context()); err != nil {
+		log.Warn("ping error", zap.Error(err))
 		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
 		return
 	}
@@ -199,20 +170,11 @@ func (mm *MetricManager) BatchHandler(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	if db, ok := mm.Store.(*DataBase); ok {
-		if err = db.insertBatch(req.Context(), metrics); err != nil {
-			log.Warn("UpdatesJSON(): couldn't send the batch", zap.Error(err))
-			http.Error(rw, s.InternalErrorMsg, http.StatusBadRequest)
-			return
-		}
-	} else {
-		for _, metric := range metrics {
-			if _, err = mm.Store.Put(req.Context(), metric); err != nil {
-				log.Warn("updatesJSON(): couldn't insert batch to file or mem store")
-				http.Error(rw, s.InternalErrorMsg, http.StatusBadRequest)
-				return
-			}
-		}
+	if err = mm.Store.PutBatch(req.Context(), metrics); err != nil {
+		log.Warn("UpdatesJSON(): couldn't send the batch", zap.Error(err))
+		http.Error(rw, s.InternalErrorMsg, http.StatusBadRequest)
+		return
 	}
+
 	rw.WriteHeader(http.StatusOK)
 }
