@@ -12,7 +12,7 @@ func main() {
 	ctx, complete := config.CompletionCtx()
 	defer complete()
 
-	server, err := config.Configure(ctx, &server.MetricManager{},
+	serv, err := config.Configure(ctx, &server.MetricManager{},
 		config.EnvFlagsServer,
 		config.WithRoutes,
 		config.WithStorage,
@@ -20,6 +20,5 @@ func main() {
 	if err != nil {
 		logger.Fatal("server config error", zap.Error(err))
 	}
-
-	server.Run(ctx)
+	serv.Run(ctx)
 }

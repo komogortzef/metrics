@@ -2,6 +2,7 @@ package server
 
 import (
 	ctx "context"
+	"fmt"
 	"os"
 	"time"
 
@@ -21,47 +22,47 @@ type Storage interface {
 	Close()
 }
 
-func NewStorage(ctx ctx.Context, m *MetricManager) (err error) {
-	if m.DBAddress != "" {
-		if m.Store, err = NewDB(ctx, m.DBAddress); err != nil {
+func NewStorage(cx ctx.Context, m *MetricManager) (err error) {
+	switch {
+	case m.DBAddress != "":
+		if m.Store, err = NewDB(cx, m.DBAddress); err != nil {
 			return err
 		}
 		m.FileStoragePath = s.NoStorage
-	} else if m.FileStoragePath != "" {
+	case m.FileStoragePath != "":
 		store := NewFileStore(m.FileStoragePath, m.StoreInterval)
 		if m.Restore {
-			if err := store.restoreFromFile(ctx); err != nil {
+			if err := store.restoreFromFile(cx); err != nil {
 				log.Warn("restore from file error", zap.Error(err))
 			}
 		}
 		if !store.syncDump {
-			dumpWait(ctx, store, m.FileStoragePath, m.StoreInterval)
+			dumpWait(cx, store, m.FileStoragePath, m.StoreInterval)
 		}
 		m.Store = store
-	} else {
+	default:
 		m.Store = NewMemStore()
 	}
-	return
+	return nil
 }
 
-func dump(ctx ctx.Context, path string, store Storage) error {
-	log.Debug("Dump to file...")
-	items, _ := store.List(ctx)
+func dump(cx ctx.Context, path string, store Storage) error {
+	items, _ := store.List(cx)
 	metBytes, err := ffjson.Marshal(items)
 	if err != nil {
-		log.Warn("couldn't marshal", zap.Error(err))
+		return fmt.Errorf("dump err: %w", err)
 	}
-	if err = os.WriteFile(path, metBytes, 0666); err != nil {
+	err = os.WriteFile(path, metBytes, 0o666)
+	if err != nil && !os.IsPermission(err) {
 		log.Warn("couldn't write to file. Try three more times...")
-		err = s.Retry(ctx, func() error {
-			return os.WriteFile(path, metBytes, 0666)
+		err = s.Retry(cx, func() error {
+			return os.WriteFile(path, metBytes, 0o666)
 		})
 	}
-
 	return err
 }
 
-func dumpWait(ctx ctx.Context, store Storage, path string, interval int) {
+func dumpWait(cx ctx.Context, store Storage, path string, interval int) {
 	log.Debug("fs.DumpWait run...")
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	go func() {
@@ -69,11 +70,11 @@ func dumpWait(ctx ctx.Context, store Storage, path string, interval int) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := dump(ctx, path, store); err != nil {
+				if err := dump(cx, path, store); err != nil {
 					log.Warn("fs.dumpWithinterval(): Couldn't save data to file")
 					return
 				}
-			case <-ctx.Done():
+			case <-cx.Done():
 				log.Info("DumpWait is stopped")
 				return
 			}

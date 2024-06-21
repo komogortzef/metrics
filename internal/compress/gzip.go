@@ -24,7 +24,6 @@ func (c *compressWriter) Header() http.Header {
 }
 
 func (c *compressWriter) Write(p []byte) (int, error) {
-	// return c.zw.Write(p)
 	compB, err := Compress(p)
 	if err != nil {
 		return 0, err

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"runtime"
 
@@ -51,21 +52,21 @@ func (sm *SelfMonitor) sendBatch() error {
 	url := "http://" + sm.Address + "/updates/"
 	data, err := ffjson.Marshal(sm.metrics)
 	if err != nil {
-		return err
+		return fmt.Errorf("sendBatch marshal err: %w", err)
 	}
 	compressData, err := compress.Compress(data)
 	if err != nil {
-		return err
+		return fmt.Errorf("sendBatch compress err: %w", err)
 	}
-
 	req, _ := http.NewRequest(http.MethodPost, url, bytes.NewReader(compressData))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
 	r, err := http.DefaultClient.Do(req)
-
+	if err != nil {
+		return fmt.Errorf("sendBatch client error: %w", err)
+	}
 	if r != nil && r.Body != nil {
 		r.Body.Close()
 	}
-
-	return err
+	return nil
 }

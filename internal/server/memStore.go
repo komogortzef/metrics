@@ -49,7 +49,7 @@ func (ms *MemStorage) Get(_ ctx.Context, m *s.Metrics) (*s.Metrics, error) {
 	return met, err
 }
 
-func (ms *MemStorage) List(ctx ctx.Context) ([]*s.Metrics, error) {
+func (ms *MemStorage) List(_ ctx.Context) ([]*s.Metrics, error) {
 	i := 0
 	ms.mtx.RLock()
 	metrics := make([]*s.Metrics, ms.len)
@@ -61,9 +61,9 @@ func (ms *MemStorage) List(ctx ctx.Context) ([]*s.Metrics, error) {
 	return metrics, nil
 }
 
-func (ms *MemStorage) PutBatch(ctx ctx.Context, mets []*s.Metrics) error {
+func (ms *MemStorage) PutBatch(cx ctx.Context, mets []*s.Metrics) error {
 	for _, metric := range mets {
-		if _, err := ms.Put(ctx, metric); err != nil {
+		if _, err := ms.Put(cx, metric); err != nil {
 			log.Warn("Mem PutBatch: couldn't insert batch to file or mem store")
 			return err
 		}
@@ -75,7 +75,6 @@ func (ms *MemStorage) Ping(_ ctx.Context) error {
 	log.Info("Memory storage is working...")
 	return nil
 }
-
 func (ms *MemStorage) Close() {
-	log.Info("Memory storage is closed")
+	log.Info("Memory storage is closed;)")
 }

@@ -18,7 +18,7 @@ import (
 )
 
 func EnvFlagsAgent(_ ctx.Context, cfg Config) (err error) {
-	agent, ok := cfg.(*agent.SelfMonitor)
+	ag, ok := cfg.(*agent.SelfMonitor)
 	if !ok {
 		return ErrInvalidConfig
 	}
@@ -30,20 +30,20 @@ func EnvFlagsAgent(_ ctx.Context, cfg Config) (err error) {
 	poll := flag.Int("p", s.DefaultPollInterval, "Poll Interval arg: -p <sec>")
 	rep := flag.Int("r", s.DefaultReportInterval, "Report interval arg: -r <sec>")
 	flag.Parse()
-	if agent.Address == "none" {
-		agent.Address = *addr
+	if ag.Address == "none" {
+		ag.Address = *addr
 	}
-	if agent.PollInterval < 0 {
-		agent.PollInterval = *poll
+	if ag.PollInterval < 0 {
+		ag.PollInterval = *poll
 	}
-	if agent.ReportInterval < 0 {
-		agent.ReportInterval = *rep
+	if ag.ReportInterval < 0 {
+		ag.ReportInterval = *rep
 	}
 	return
 }
 
 func EnvFlagsServer(_ ctx.Context, cfg Config) (err error) {
-	server, ok := cfg.(*server.MetricManager)
+	serv, ok := cfg.(*server.MetricManager)
 	if !ok {
 		return ErrInvalidConfig
 	}
@@ -57,22 +57,22 @@ func EnvFlagsServer(_ ctx.Context, cfg Config) (err error) {
 	rest := flag.Bool("r", s.DefaultRestore, "Restore storage arg: -r <true|false>")
 	dbAddr := flag.String("d", s.NoStorage, "DB address arg: -d <dbserver://username:password@host:port/db_name>")
 	flag.Parse()
-	if server.Address == "none" {
-		server.Address = *addr
+	if serv.Address == "none" {
+		serv.Address = *addr
 	}
-	if server.StoreInterval < 0 {
-		server.StoreInterval = *storeInterv
+	if serv.StoreInterval < 0 {
+		serv.StoreInterval = *storeInterv
 	}
 	if filestore, ok := os.LookupEnv("FILE_STORAGE_PATH"); !ok {
-		server.FileStoragePath = *filePath
+		serv.FileStoragePath = *filePath
 	} else {
-		server.FileStoragePath = filestore
+		serv.FileStoragePath = filestore
 	}
-	if server.Restore {
-		server.Restore = *rest
+	if serv.Restore {
+		serv.Restore = *rest
 	}
-	if server.DBAddress == "none" {
-		server.DBAddress = *dbAddr
+	if serv.DBAddress == "none" {
+		serv.DBAddress = *dbAddr
 	}
 	return
 }

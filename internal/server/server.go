@@ -24,7 +24,7 @@ type MetricManager struct {
 	DBAddress       string `env:"DATABASE_DSN" envDefault:"none"`
 }
 
-func (mm *MetricManager) Run(ctx ctx.Context) {
+func (mm *MetricManager) Run(cx ctx.Context) {
 	errChan := make(chan error, 1)
 	go func() {
 		err := mm.Serv.ListenAndServe()
@@ -34,12 +34,12 @@ func (mm *MetricManager) Run(ctx ctx.Context) {
 		close(errChan)
 	}()
 	select {
-	case <-ctx.Done():
+	case <-cx.Done():
 		if mm.FileStoragePath != s.NoStorage {
-			_ = dump(ctx, mm.FileStoragePath, mm.Store)
+			_ = dump(cx, mm.FileStoragePath, mm.Store)
 		}
 		mm.Store.Close()
-		if err := mm.Serv.Shutdown(ctx); err != nil {
+		if err := mm.Serv.Shutdown(cx); err != nil {
 			log.Fatal("server shutdown err", zap.Error(err))
 		}
 		log.Debug("Goodbye!")
@@ -83,7 +83,6 @@ func (mm *MetricManager) GetHandler(rw http.ResponseWriter, req *http.Request) {
 	} else {
 		numStr = strconv.FormatFloat(*metric.Value, 'f', -1, 64)
 	}
-
 	rw.WriteHeader(http.StatusOK)
 	_, _ = rw.Write([]byte(numStr))
 }
@@ -105,7 +104,6 @@ func (mm *MetricManager) GetAllHandler(rw http.ResponseWriter, req *http.Request
 		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
 		return
 	}
-
 	rw.Header().Set("Content-Type", "text/html")
 	rw.WriteHeader(http.StatusOK)
 	_, _ = rw.Write(html.Bytes())
@@ -125,7 +123,6 @@ func (mm *MetricManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
 		return
 	}
-
 	bytes, _ = metric.MarshalJSON()
 	rw.WriteHeader(http.StatusOK)
 	_, _ = rw.Write(bytes)
@@ -151,7 +148,6 @@ func (mm *MetricManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, s.NotFoundMessage, http.StatusNotFound)
 		return
 	}
-
 	bytes, _ = metric.MarshalJSON()
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusOK)
@@ -165,7 +161,7 @@ func (mm *MetricManager) PingHandler(rw http.ResponseWriter, req *http.Request) 
 		return
 	}
 	rw.WriteHeader(http.StatusOK)
-	rw.Write([]byte("The connection is established!"))
+	_, _ = rw.Write([]byte("The connection is established!"))
 }
 
 func (mm *MetricManager) BatchHandler(rw http.ResponseWriter, req *http.Request) {
@@ -189,6 +185,5 @@ func (mm *MetricManager) BatchHandler(rw http.ResponseWriter, req *http.Request)
 		http.Error(rw, s.InternalErrorMsg, http.StatusBadRequest)
 		return
 	}
-
 	rw.WriteHeader(http.StatusOK)
 }

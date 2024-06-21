@@ -3,6 +3,7 @@ package config
 import (
 	ctx "context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,10 +26,10 @@ type Option func(ctx.Context, Config) error
 func Configure(ctx ctx.Context, cfg Config, opts ...Option) (Config, error) {
 	err := log.InitLog()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("init log: %w", err)
 	}
 	for _, opt := range opts {
-		if err = opt(ctx, cfg); err != nil {
+		if err := opt(ctx, cfg); err != nil {
 			return nil, err
 		}
 	}
@@ -46,16 +47,16 @@ func Configure(ctx ctx.Context, cfg Config, opts ...Option) (Config, error) {
 			zap.Int("poll interval", c.PollInterval),
 			zap.Int("report interval", c.ReportInterval))
 	}
-	return cfg, err
+	return cfg, nil
 }
 
 func CompletionCtx() (ctx.Context, ctx.CancelFunc) {
-	ctx, complete := ctx.WithCancel(ctx.Background())
+	cx, complete := ctx.WithCancel(ctx.Background())
 	signChan := make(chan os.Signal, 1)
 	signal.Notify(signChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-signChan
 		complete()
 	}()
-	return ctx, complete
+	return cx, complete
 }

@@ -34,81 +34,78 @@ var (
 	ErrConnDB = errors.New("db connection error")
 )
 
-func NewDB(ctx ctx.Context, addr string) (*DataBase, error) {
-	log.Debug("DB Put ...")
+func NewDB(cx ctx.Context, addr string) (*DataBase, error) {
 	config, err := pgxpool.ParseConfig(addr)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse connection string: %w", err)
+		return nil, fmt.Errorf("newDB: unable to parse connection string: %w", err)
 	}
-	pool, err := pgxpool.NewWithConfig(ctx, config)
+	pool, err := pgxpool.NewWithConfig(cx, config)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create connection pool: %w", err)
+		return nil, fmt.Errorf("newDB: unable to create connection pool: %w", err)
 	}
-	if err = createTables(ctx, pool); err != nil {
+	if err := createTables(cx, pool); err != nil {
 		return nil, err
 	}
-	if err = prepareQueries(ctx, pool); err != nil {
+	if err := prepareQueries(cx, pool); err != nil {
 		return nil, err
 	}
-
-	return &DataBase{Pool: pool}, nil
+	return &DataBase{pool}, nil
 }
 
-func connect(ctx ctx.Context, db *DataBase) (*pgxpool.Conn, error) {
-	conn, err := db.Acquire(ctx)
+func connect(cx ctx.Context, db *DataBase) (*pgxpool.Conn, error) {
+	conn, err := db.Acquire(cx)
 	if err != nil {
-		if err = s.Retry(ctx, func() error {
-			conn, err = db.Acquire(ctx)
-			return err
+		if err = s.Retry(cx, func() error {
+			conn, err = db.Acquire(cx)
+			return ErrConnDB
 		}); err != nil {
 			return nil, ErrConnDB
 		}
 	}
-	if err = conn.Conn().Ping(ctx); err != nil {
-		if err = s.Retry(ctx, func() error {
-			err = conn.Conn().Ping(ctx)
-			return err
+	if err = conn.Conn().Ping(cx); err != nil {
+		if err = s.Retry(cx, func() error {
+			err = conn.Conn().Ping(cx)
+			return ErrConnDB
 		}); err != nil {
 			return nil, ErrConnDB
 		}
 	}
-
 	log.Debug("DB connection is established")
 	return conn, nil
 }
 
-func (db *DataBase) Put(ctx ctx.Context, m *s.Metrics) (*s.Metrics, error) {
-	log.Debug("DB Put ...")
-	conn, err := connect(ctx, db)
+func (db *DataBase) Put(cx ctx.Context, m *s.Metrics) (*s.Metrics, error) {
+	conn, err := connect(cx, db)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("db put conn err: %w", err)
 	}
 	defer conn.Release()
 
 	var val any
 	query := getQuery(insertMetric, m.MType)
-	err = conn.QueryRow(ctx, query, m.ToSlice()...).Scan(&val)
+	if err = conn.QueryRow(cx, query, m.ToSlice()...).Scan(&val); err != nil {
+		return nil, fmt.Errorf("db put queryRow error: %w", err)
+	}
 	if v, ok := val.(int64); ok {
 		m.Delta = &v
 	} else {
 		v, _ := val.(float64)
 		m.Value = &v
 	}
-	return m, err
+	return m, nil
 }
 
-func (db *DataBase) Get(ctx ctx.Context, m *s.Metrics) (*s.Metrics, error) {
-	log.Debug("DB Get...")
-	conn, err := connect(ctx, db)
+func (db *DataBase) Get(cx ctx.Context, m *s.Metrics) (*s.Metrics, error) {
+	conn, err := connect(cx, db)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("db get conn err: %w", err)
 	}
 	defer conn.Release()
 
 	query := getQuery(selectMetric, m.MType)
 	var val any
-	if err = conn.QueryRow(ctx, query, m.ID).Scan(&val); err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+	if err = conn.QueryRow(cx, query, m.ID).Scan(&val); err != nil {
+		return nil, fmt.Errorf("db get failed to execute query: %w", err)
 	}
 	if v, ok := val.(int64); ok {
 		m.Delta = &v
@@ -116,27 +113,26 @@ func (db *DataBase) Get(ctx ctx.Context, m *s.Metrics) (*s.Metrics, error) {
 		v, _ := val.(float64)
 		m.Value = &v
 	}
-	return m, err
+	return m, nil
 }
 
-func (db *DataBase) List(ctx ctx.Context) (metrics []*s.Metrics, err error) {
-	log.Debug("DB List...")
-	conn, err := connect(ctx, db)
+func (db *DataBase) List(cx ctx.Context) (metrics []*s.Metrics, err error) {
+	conn, err := connect(cx, db)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("db list conn err: %w", err)
 	}
 	defer conn.Release()
 
-	rows, err := conn.Query(ctx, selectAll)
+	rows, err := conn.Query(cx, selectAll)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dbList query err: %w", err)
 	}
 	for rows.Next() {
 		var met s.Metrics
 		var val any
 		err := rows.Scan(&met.ID, &val)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("dbList query scan err: %w", err)
 		}
 		if v, ok := val.(int64); ok {
 			met.Delta = &v
@@ -149,42 +145,39 @@ func (db *DataBase) List(ctx ctx.Context) (metrics []*s.Metrics, err error) {
 	return metrics, nil
 }
 
-func (db *DataBase) PutBatch(ctx ctx.Context, mets []*s.Metrics) error {
-	log.Debug("Batch sending...")
-	conn, err := db.Acquire(ctx)
+func (db *DataBase) PutBatch(cx ctx.Context, mets []*s.Metrics) error {
+	conn, err := db.Acquire(cx)
 	if err != nil {
-		return fmt.Errorf("failed to acquire connection: %w", err)
+		return fmt.Errorf("putBatch err: %w", err)
 	}
 	defer conn.Release()
 
-	tx, err := conn.Begin(ctx)
+	tx, err := conn.Begin(cx)
 	if err != nil {
 		return fmt.Errorf("failed transaction beginning: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(cx)
 	batch := &pgx.Batch{}
 	for _, m := range mets {
 		batch.Queue(getQuery(insertMetric, m.MType), m.ToSlice()...)
 	}
-	br := tx.SendBatch(ctx, batch)
+	br := tx.SendBatch(cx, batch)
 	if _, err := br.Exec(); err != nil {
 		return fmt.Errorf("batch exec failed: %w", err)
 	}
 	if err := br.Close(); err != nil {
 		return fmt.Errorf("failed to close batch res: %w", err)
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(cx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 	return nil
 }
 
-func (db *DataBase) Ping(ctx ctx.Context) error {
-	if err := db.Pool.Ping(ctx); err != nil {
-		log.Warn("PingHandler(): There is no connection to data base")
-		return err
+func (db *DataBase) Ping(cx ctx.Context) error {
+	if err := db.Pool.Ping(cx); err != nil {
+		return fmt.Errorf("ping err: %w", err)
 	}
-	log.Info("DataBase storage is working")
 	return nil
 }
 
@@ -193,10 +186,10 @@ func (db *DataBase) Close() {
 	log.Info("DataBase connection is closed")
 }
 
-func prepareQueries(ctx ctx.Context, pool *pgxpool.Pool) error {
-	conn, err := pool.Acquire(ctx)
+func prepareQueries(cx ctx.Context, pool *pgxpool.Pool) error {
+	conn, err := pool.Acquire(cx)
 	if err != nil {
-		return fmt.Errorf("couldn't acquire a connection: %w", err)
+		return fmt.Errorf("prepareQueries conn err: %w", err)
 	}
 	defer conn.Release()
 
@@ -220,15 +213,14 @@ func prepareQueries(ctx ctx.Context, pool *pgxpool.Pool) error {
 			        SELECT id, value FROM counter;`,
 	}
 	for name, query := range queries {
-		if _, err = conn.Conn().Prepare(ctx, name, query); err != nil {
-			return fmt.Errorf("failed to prepare query %s: %w", name, err)
+		if _, err = conn.Conn().Prepare(cx, name, query); err != nil {
+			return fmt.Errorf("prepareQueries %s err: %w", name, err)
 		}
 	}
 	return nil
 }
 
-func createTables(ctx ctx.Context, pool *pgxpool.Pool) error {
-	log.Debug("Creating tables!")
+func createTables(cx ctx.Context, pool *pgxpool.Pool) error {
 	query := `
 	CREATE TABLE IF NOT EXISTS counter(
 		id VARCHAR(255) PRIMARY KEY,
@@ -238,9 +230,8 @@ func createTables(ctx ctx.Context, pool *pgxpool.Pool) error {
 	   id VARCHAR(255) PRIMARY KEY,
 	   value DOUBLE PRECISION NOT NULL
 	);`
-	if _, err := pool.Exec(ctx, query); err != nil {
+	if _, err := pool.Exec(cx, query); err != nil {
 		return fmt.Errorf("couldn't create tables: %w", err)
 	}
-
 	return nil
 }

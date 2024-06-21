@@ -12,8 +12,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 )
 
-// часто используемые строковые литералы в виде констант
-const (
+const ( // часто используемые строковые литералы в виде констант
 	DefaultEndpoint       = "localhost:8080"
 	DefaultPollInterval   = 2
 	DefaultReportInterval = 10
@@ -22,17 +21,15 @@ const (
 	DefaultRestore        = true
 	DefaultSendMode       = "text"
 	NoStorage             = ""
-
-	InternalErrorMsg  = "internal server error"
-	NotFoundMessage   = "not found"
-	BadRequestMessage = "bad request"
-
-	Gauge   = "gauge"
-	Counter = "counter"
-	Mtype   = "type"
-	ID      = "id"
-	Value   = "value"
-	Delta   = "delta"
+	InternalErrorMsg      = "internal server error"
+	NotFoundMessage       = "not found"
+	BadRequestMessage     = "bad request"
+	Gauge                 = "gauge"
+	Counter               = "counter"
+	Mtype                 = "type"
+	ID                    = "id"
+	Value                 = "value"
+	Delta                 = "delta"
 )
 
 var (
@@ -48,7 +45,6 @@ type Metrics struct {
 	Value *float64 `json:"value,omitempty"`
 }
 
-// сборка метрики для сервера
 func NewMetric(mtype, id string, val string) (*Metrics, error) {
 	var metric Metrics
 	if mtype != Counter && mtype != Gauge {
@@ -72,7 +68,6 @@ func NewMetric(mtype, id string, val string) (*Metrics, error) {
 	return &metric, nil
 }
 
-// сборка метрики для агента
 func BuildMetric(name string, val any) Metrics {
 	var metric Metrics
 	metric.ID = name
@@ -118,7 +113,7 @@ func (met Metrics) ToSlice() []any {
 	return []any{met.ID, *met.Value}
 }
 
-func Retry(ctx ctx.Context, fn func() error) error {
+func Retry(cx ctx.Context, fn func() error) error {
 	log.Debug("Retry...")
 	expBackoff := backoff.NewExponentialBackOff()
 	expBackoff.InitialInterval = 1 * time.Second
@@ -126,5 +121,5 @@ func Retry(ctx ctx.Context, fn func() error) error {
 	expBackoff.MaxInterval = 5 * time.Second
 	expBackoff.MaxElapsedTime = 11 * time.Second
 
-	return backoff.Retry(fn, backoff.WithContext(expBackoff, ctx))
+	return backoff.Retry(fn, backoff.WithContext(expBackoff, cx))
 }

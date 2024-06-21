@@ -23,10 +23,10 @@ type SelfMonitor struct {
 	mtx            *sync.RWMutex
 }
 
-func (sm *SelfMonitor) collect(ctx ctx.Context) {
+func (sm *SelfMonitor) collect(cx ctx.Context) {
 	for {
 		select {
-		case <-ctx.Done():
+		case <-cx.Done():
 			log.Debug("Goodbye from collect")
 			return
 		default:
@@ -42,10 +42,10 @@ func (sm *SelfMonitor) collect(ctx ctx.Context) {
 	}
 }
 
-func (sm *SelfMonitor) report(ctx ctx.Context) {
+func (sm *SelfMonitor) report(cx ctx.Context) {
 	for {
 		select {
-		case <-ctx.Done():
+		case <-cx.Done():
 			log.Debug("Goodbye from report")
 			return
 		default:
@@ -53,7 +53,7 @@ func (sm *SelfMonitor) report(ctx ctx.Context) {
 			log.Debug("sending...")
 			sm.mtx.RLock()
 			if err := sm.sendBatch(); err != nil {
-				if err = s.Retry(ctx, sm.sendBatch); err != nil {
+				if err = s.Retry(cx, sm.sendBatch); err != nil {
 					log.Warn("Sending error", zap.Error(err))
 					sm.mtx.RUnlock()
 					continue
@@ -66,11 +66,11 @@ func (sm *SelfMonitor) report(ctx ctx.Context) {
 	}
 }
 
-func (sm *SelfMonitor) Run(ctx ctx.Context) {
+func (sm *SelfMonitor) Run(cx ctx.Context) {
 	sm.mtx = &sync.RWMutex{}
-	go sm.collect(ctx)
-	go sm.report(ctx)
+	go sm.collect(cx)
+	go sm.report(cx)
 
-	<-ctx.Done()
+	<-cx.Done()
 	log.Debug("Goodbye!")
 }
