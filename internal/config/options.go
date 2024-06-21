@@ -15,7 +15,6 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 )
 
 func EnvFlagsAgent(_ ctx.Context, cfg Config) (err error) {
@@ -111,24 +110,5 @@ func WithStorage(ctx ctx.Context, cfg Config) (err error) {
 	if !ok {
 		return ErrInvalidConfig
 	}
-	if manager.DBAddress != "" {
-		if manager.Store, err = server.NewDB(ctx, manager.DBAddress); err != nil {
-			return err
-		}
-		manager.FileStoragePath = s.NoStorage
-	} else if manager.FileStoragePath != "" {
-		store := server.NewFileStore(manager.FileStoragePath)
-		if manager.StoreInterval > 0 {
-			store.SyncDump = false
-		}
-		if manager.Restore {
-			if err := store.RestoreFromFile(ctx); err != nil {
-				log.Warn("restore from file error", zap.Error(err))
-			}
-		}
-		manager.Store = store
-	} else {
-		manager.Store = server.NewMemStore()
-	}
-	return
+	return server.NewStorage(ctx, manager)
 }

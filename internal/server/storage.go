@@ -21,6 +21,29 @@ type Storage interface {
 	Close()
 }
 
+func NewStorage(ctx ctx.Context, m *MetricManager) (err error) {
+	if m.DBAddress != "" {
+		if m.Store, err = NewDB(ctx, m.DBAddress); err != nil {
+			return err
+		}
+		m.FileStoragePath = s.NoStorage
+	} else if m.FileStoragePath != "" {
+		store := NewFileStore(m.FileStoragePath, m.StoreInterval)
+		if m.Restore {
+			if err := store.restoreFromFile(ctx); err != nil {
+				log.Warn("restore from file error", zap.Error(err))
+			}
+		}
+		if !store.syncDump {
+			dumpWait(ctx, store, m.FileStoragePath, m.StoreInterval)
+		}
+		m.Store = store
+	} else {
+		m.Store = NewMemStore()
+	}
+	return
+}
+
 func dump(ctx ctx.Context, path string, store Storage) error {
 	log.Debug("Dump to file...")
 	items, _ := store.List(ctx)
@@ -45,7 +68,7 @@ func dumpWait(ctx ctx.Context, store Storage, path string, interval int) {
 					return
 				}
 			case <-ctx.Done():
-				log.Info("DumpWait end...")
+				log.Info("DumpWait is stopped")
 				return
 			}
 		}

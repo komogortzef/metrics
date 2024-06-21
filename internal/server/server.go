@@ -32,10 +32,6 @@ func (mm *MetricManager) Run(ctx ctx.Context) {
 		}
 		close(errChan)
 	}()
-	if mm.StoreInterval > 0 && mm.FileStoragePath != s.NoStorage {
-		dumpWait(ctx, mm.Store, mm.FileStoragePath, mm.StoreInterval)
-	}
-
 	select {
 	case <-ctx.Done():
 		if mm.FileStoragePath != s.NoStorage {
