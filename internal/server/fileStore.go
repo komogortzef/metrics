@@ -24,7 +24,7 @@ func NewFileStore(path string) *FileStorage {
 	}
 }
 
-func (fs *FileStorage) Put(ctx ctx.Context, met s.Metrics) (s.Metrics, error) {
+func (fs *FileStorage) Put(ctx ctx.Context, met *s.Metrics) (*s.Metrics, error) {
 	m, _ := fs.MemStorage.Put(ctx, met)
 	if fs.SyncDump {
 		if err := dump(ctx, fs.FilePath, fs); err != nil {
@@ -34,7 +34,7 @@ func (fs *FileStorage) Put(ctx ctx.Context, met s.Metrics) (s.Metrics, error) {
 	return m, nil
 }
 
-func (fs *FileStorage) PutBatch(ctx ctx.Context, mets []s.Metrics) error {
+func (fs *FileStorage) PutBatch(ctx ctx.Context, mets []*s.Metrics) error {
 	_ = fs.MemStorage.PutBatch(ctx, mets)
 	if fs.SyncDump {
 		if err := dump(ctx, fs.FilePath, fs); err != nil {
@@ -57,7 +57,7 @@ func (fs *FileStorage) RestoreFromFile(ctx ctx.Context) error {
 		var met s.Metrics
 		bytes := scanner.Bytes()
 		_ = met.UnmarshalJSON(bytes)
-		_, _ = fs.MemStorage.Put(ctx, met)
+		_, _ = fs.MemStorage.Put(ctx, &met)
 	}
 	return err
 }

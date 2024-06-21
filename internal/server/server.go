@@ -66,7 +66,8 @@ func (mm *MetricManager) UpdateHandler(rw http.ResponseWriter, req *http.Request
 
 func (mm *MetricManager) GetHandler(rw http.ResponseWriter, req *http.Request) {
 	mtype, name, _ := processURL(req.URL.Path)
-	metric, err := mm.Store.Get(req.Context(), s.Metrics{ID: name, MType: mtype})
+	met := &s.Metrics{ID: name, MType: mtype}
+	metric, err := mm.Store.Get(req.Context(), met)
 	if err != nil {
 		log.Warn("GetHandler(): Coundn't fetch the metric from store", zap.Error(err))
 		http.Error(rw, s.NotFoundMessage, http.StatusNotFound)
@@ -108,7 +109,7 @@ func (mm *MetricManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) {
 	}
 	defer req.Body.Close()
 
-	var metric s.Metrics
+	metric := &s.Metrics{}
 	_ = metric.UnmarshalJSON(bytes)
 	if metric, err = mm.Store.Put(req.Context(), metric); err != nil {
 		log.Warn("UpdateJSON(): couldn't write to store", zap.Error(err))
@@ -130,7 +131,7 @@ func (mm *MetricManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 	}
 	defer req.Body.Close()
 
-	var metric s.Metrics
+	metric := &s.Metrics{}
 	_ = metric.UnmarshalJSON(bytes)
 	if metric, err = mm.Store.Get(req.Context(), metric); err != nil {
 		log.Warn("GetJSON(): No such metric in store", zap.Error(err))
@@ -163,7 +164,7 @@ func (mm *MetricManager) BatchHandler(rw http.ResponseWriter, req *http.Request)
 	}
 	defer req.Body.Close()
 
-	var metrics []s.Metrics
+	var metrics []*s.Metrics
 	if err = ffjson.Unmarshal(b, &metrics); err != nil {
 		log.Warn("batchHandler(): unmarshal error", zap.Error(err))
 		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)

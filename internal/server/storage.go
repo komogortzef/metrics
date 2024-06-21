@@ -10,10 +10,10 @@ import (
 )
 
 type Storage interface {
-	Put(ctx.Context, s.Metrics) (s.Metrics, error)
-	Get(ctx.Context, s.Metrics) (s.Metrics, error)
-	List(ctx.Context) ([]s.Metrics, error)
-	PutBatch(ctx.Context, []s.Metrics) error
+	Put(ctx.Context, *s.Metrics) (*s.Metrics, error)
+	Get(ctx.Context, *s.Metrics) (*s.Metrics, error)
+	List(ctx.Context) ([]*s.Metrics, error)
+	PutBatch(ctx.Context, []*s.Metrics) error
 	Ping(ctx.Context) error
 	Close()
 }

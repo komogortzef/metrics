@@ -14,19 +14,19 @@ const metricsNumber = 29
 var ErrNoValue = errors.New("no such value in storage")
 
 type MemStorage struct {
-	items map[string]s.Metrics
+	items map[string]*s.Metrics
 	len   int
 	mtx   *sync.RWMutex
 }
 
 func NewMemStore() *MemStorage {
 	return &MemStorage{
-		items: make(map[string]s.Metrics, metricsNumber),
+		items: make(map[string]*s.Metrics, metricsNumber),
 		mtx:   &sync.RWMutex{},
 	}
 }
 
-func (ms *MemStorage) Put(_ ctx.Context, met s.Metrics) (s.Metrics, error) {
+func (ms *MemStorage) Put(_ ctx.Context, met *s.Metrics) (*s.Metrics, error) {
 	ms.mtx.Lock()
 	oldMet, exists := ms.items[met.ID]
 	met.MergeMetrics(oldMet)
@@ -38,7 +38,7 @@ func (ms *MemStorage) Put(_ ctx.Context, met s.Metrics) (s.Metrics, error) {
 	return met, nil
 }
 
-func (ms *MemStorage) Get(_ ctx.Context, m s.Metrics) (s.Metrics, error) {
+func (ms *MemStorage) Get(_ ctx.Context, m *s.Metrics) (*s.Metrics, error) {
 	var err error
 	ms.mtx.RLock()
 	met, ok := ms.items[m.ID]
@@ -49,10 +49,10 @@ func (ms *MemStorage) Get(_ ctx.Context, m s.Metrics) (s.Metrics, error) {
 	return met, err
 }
 
-func (ms *MemStorage) List(ctx ctx.Context) ([]s.Metrics, error) {
+func (ms *MemStorage) List(ctx ctx.Context) ([]*s.Metrics, error) {
 	i := 0
 	ms.mtx.RLock()
-	metrics := make([]s.Metrics, ms.len)
+	metrics := make([]*s.Metrics, ms.len)
 	for _, met := range ms.items {
 		metrics[i] = met
 		i++
@@ -61,7 +61,7 @@ func (ms *MemStorage) List(ctx ctx.Context) ([]s.Metrics, error) {
 	return metrics, nil
 }
 
-func (ms *MemStorage) PutBatch(ctx ctx.Context, mets []s.Metrics) error {
+func (ms *MemStorage) PutBatch(ctx ctx.Context, mets []*s.Metrics) error {
 	for _, metric := range mets {
 		if _, err := ms.Put(ctx, metric); err != nil {
 			log.Warn("Mem PutBatch: couldn't insert batch to file or mem store")

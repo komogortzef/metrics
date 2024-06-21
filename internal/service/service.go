@@ -49,27 +49,27 @@ type Metrics struct {
 }
 
 // сборка метрики для сервера
-func NewMetric(mtype, id string, val string) (Metrics, error) {
+func NewMetric(mtype, id string, val string) (*Metrics, error) {
 	var metric Metrics
 	if mtype != Counter && mtype != Gauge {
-		return metric, ErrInvalidType
+		return &metric, ErrInvalidType
 	}
 	metric.MType = mtype
 	metric.ID = id
 	if mtype == Counter {
 		num, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
-			return metric, ErrInvalidVal
+			return &metric, ErrInvalidVal
 		}
 		metric.Delta = &num
 	} else {
 		num, err := strconv.ParseFloat(val, 64)
 		if err != nil {
-			return metric, ErrInvalidVal
+			return &metric, ErrInvalidVal
 		}
 		metric.Value = &num
 	}
-	return metric, nil
+	return &metric, nil
 }
 
 // сборка метрики для агента
@@ -98,7 +98,10 @@ func (met Metrics) String() string {
 	return fmt.Sprintf(" (%s: %g)", met.ID, *met.Value)
 }
 
-func (met *Metrics) MergeMetrics(met2 Metrics) {
+func (met *Metrics) MergeMetrics(met2 *Metrics) {
+	if met2 == nil {
+		return
+	}
 	if met2.MType == Counter {
 		if met2.Delta == nil {
 			return
@@ -106,7 +109,6 @@ func (met *Metrics) MergeMetrics(met2 Metrics) {
 		*met.Delta += *met2.Delta
 		return
 	}
-	met = &met2
 }
 
 func (met Metrics) ToSlice() []any {

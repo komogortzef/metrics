@@ -49,7 +49,7 @@ func NewDB(ctx ctx.Context, addr string) (*DataBase, error) {
 	return &DataBase{Pool: pool}, nil
 }
 
-func (db *DataBase) Put(ctx ctx.Context, m s.Metrics) (s.Metrics, error) {
+func (db *DataBase) Put(ctx ctx.Context, m *s.Metrics) (*s.Metrics, error) {
 	log.Debug("DB Put ...")
 	err := s.Retry(ctx, func() error {
 		conn, err := db.Acquire(ctx)
@@ -73,7 +73,7 @@ func (db *DataBase) Put(ctx ctx.Context, m s.Metrics) (s.Metrics, error) {
 	return m, err
 }
 
-func (db *DataBase) Get(ctx ctx.Context, m s.Metrics) (s.Metrics, error) {
+func (db *DataBase) Get(ctx ctx.Context, m *s.Metrics) (*s.Metrics, error) {
 	log.Debug("DB Get...")
 	err := s.Retry(ctx, func() error {
 		conn, err := db.Acquire(ctx)
@@ -99,7 +99,7 @@ func (db *DataBase) Get(ctx ctx.Context, m s.Metrics) (s.Metrics, error) {
 	return m, err
 }
 
-func (db *DataBase) List(ctx ctx.Context) (metrics []s.Metrics, err error) {
+func (db *DataBase) List(ctx ctx.Context) (metrics []*s.Metrics, err error) {
 	log.Debug("DB List...")
 	err = s.Retry(ctx, func() error {
 		conn, err := db.Acquire(ctx)
@@ -125,14 +125,14 @@ func (db *DataBase) List(ctx ctx.Context) (metrics []s.Metrics, err error) {
 				v, _ := val.(float64)
 				met.Value = &v
 			}
-			metrics = append(metrics, met)
+			metrics = append(metrics, &met)
 		}
 		return nil
 	})
 	return metrics, err
 }
 
-func (db *DataBase) PutBatch(ctx ctx.Context, mets []s.Metrics) error {
+func (db *DataBase) PutBatch(ctx ctx.Context, mets []*s.Metrics) error {
 	log.Debug("Batch sending...")
 	return s.Retry(ctx, func() error {
 		conn, err := db.Acquire(ctx)
