@@ -47,9 +47,16 @@ func (fs *FileStorage) PutBatch(ctx ctx.Context, mets []*s.Metrics) error {
 
 func (fs *FileStorage) restoreFromFile(ctx ctx.Context) error {
 	log.Debug("Restore from file...")
+
 	b, err := os.ReadFile(fs.filePath)
 	if err != nil {
-		return err
+		log.Warn("couldn't read from file. Try three more times...")
+		if err = s.Retry(ctx, func() error {
+			b, err = os.ReadFile(fs.filePath)
+			return err
+		}); err != nil {
+			return err
+		}
 	}
 	var mets []*s.Metrics
 	if err = ffjson.Unmarshal(b, &mets); err != nil {

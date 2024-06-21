@@ -51,8 +51,14 @@ func dump(ctx ctx.Context, path string, store Storage) error {
 	if err != nil {
 		log.Warn("couldn't marshal", zap.Error(err))
 	}
+	if err = os.WriteFile(path, metBytes, 0666); err != nil {
+		log.Warn("couldn't write to file. Try three more times...")
+		err = s.Retry(ctx, func() error {
+			return os.WriteFile(path, metBytes, 0666)
+		})
+	}
 
-	return os.WriteFile(path, metBytes, 0666)
+	return err
 }
 
 func dumpWait(ctx ctx.Context, store Storage, path string, interval int) {
