@@ -2,6 +2,7 @@ package server
 
 import (
 	ctx "context"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -67,7 +68,11 @@ func (mm *MetricManager) GetHandler(rw http.ResponseWriter, req *http.Request) {
 	mtype, name, _ := processURL(req.URL.Path)
 	met := &s.Metrics{ID: name, MType: mtype}
 	metric, err := mm.Store.Get(req.Context(), met)
-	if err != nil {
+	if errors.Is(err, ErrConnDB) {
+		log.Warn("GetHandler(): storage error", zap.Error(err))
+		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
+		return
+	} else if err != nil {
 		log.Warn("GetHandler(): Coundn't fetch the metric from store", zap.Error(err))
 		http.Error(rw, s.NotFoundMessage, http.StatusNotFound)
 		return
@@ -85,7 +90,12 @@ func (mm *MetricManager) GetHandler(rw http.ResponseWriter, req *http.Request) {
 
 func (mm *MetricManager) GetAllHandler(rw http.ResponseWriter, req *http.Request) {
 	list := make([]Item, 0, metricsNumber)
-	metrics, _ := mm.Store.List(req.Context())
+	metrics, err := mm.Store.List(req.Context())
+	if errors.Is(err, ErrConnDB) {
+		log.Warn("GetAllHandler(): storage error", zap.Error(err))
+		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
+		return
+	}
 	for _, m := range metrics {
 		list = append(list, Item{Met: m.String()})
 	}
@@ -132,7 +142,11 @@ func (mm *MetricManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 
 	metric := &s.Metrics{}
 	_ = metric.UnmarshalJSON(bytes)
-	if metric, err = mm.Store.Get(req.Context(), metric); err != nil {
+	if metric, err = mm.Store.Get(req.Context(), metric); errors.Is(err, ErrConnDB) {
+		log.Warn("GetJSON(): store error", zap.Error(err))
+		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
+		return
+	} else if err != nil {
 		log.Warn("GetJSON(): No such metric in store", zap.Error(err))
 		http.Error(rw, s.NotFoundMessage, http.StatusNotFound)
 		return
