@@ -7,6 +7,9 @@ import (
 
 	log "metrics/internal/logger"
 	s "metrics/internal/service"
+
+	"github.com/pquerna/ffjson/ffjson"
+	"go.uber.org/zap"
 )
 
 type Storage interface {
@@ -20,18 +23,13 @@ type Storage interface {
 
 func dump(ctx ctx.Context, path string, store Storage) error {
 	log.Debug("Dump to file...")
-	var allMetBytes []byte
-	var metBytes []byte
-
-	// объединение всех метрик в один байтовый срез(разделение с помощью '\n'):
 	items, _ := store.List(ctx)
-	for _, metric := range items {
-		metBytes, _ = metric.MarshalJSON()
-		metBytes = append(metBytes, byte('\n'))
-		allMetBytes = append(allMetBytes, metBytes...)
+	metBytes, err := ffjson.Marshal(items)
+	if err != nil {
+		log.Warn("couldn't marshal", zap.Error(err))
 	}
 
-	return os.WriteFile(path, allMetBytes, 0666)
+	return os.WriteFile(path, metBytes, 0666)
 }
 
 func dumpWait(ctx ctx.Context, store Storage, path string, interval int) {

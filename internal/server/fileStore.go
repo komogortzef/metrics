@@ -1,13 +1,14 @@
 package server
 
 import (
-	"bufio"
-	"bytes"
 	ctx "context"
 	"os"
 
 	log "metrics/internal/logger"
 	s "metrics/internal/service"
+
+	"github.com/pquerna/ffjson/ffjson"
+	"go.uber.org/zap"
 )
 
 type FileStorage struct {
@@ -50,14 +51,13 @@ func (fs *FileStorage) RestoreFromFile(ctx ctx.Context) error {
 	if err != nil {
 		return err
 	}
-	buff := bytes.NewBuffer(b)
-	scanner := bufio.NewScanner(buff)
-	scanner.Split(bufio.ScanLines)
-	for scanner.Scan() {
-		var met s.Metrics
-		bytes := scanner.Bytes()
-		_ = met.UnmarshalJSON(bytes)
-		_, _ = fs.MemStorage.Put(ctx, &met)
+	var mets []*s.Metrics
+	if err = ffjson.Unmarshal(b, &mets); err != nil {
+		log.Warn("unmarshal error", zap.Error(err))
 	}
+	for _, m := range mets {
+		_, _ = fs.MemStorage.Put(ctx, m)
+	}
+
 	return err
 }

@@ -38,6 +38,9 @@ func (mm *MetricManager) Run(ctx ctx.Context) {
 
 	select {
 	case <-ctx.Done():
+		if mm.FileStoragePath != s.NoStorage {
+			_ = dump(ctx, mm.FileStoragePath, mm.Store)
+		}
 		mm.Store.Close()
 		if err := mm.Serv.Shutdown(ctx); err != nil {
 			log.Fatal("server shutdown err", zap.Error(err))
