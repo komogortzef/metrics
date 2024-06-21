@@ -121,7 +121,7 @@ func (met Metrics) ToSlice() []any {
 func Retry(ctx ctx.Context, fn func() error) error {
 	log.Debug("Retry...")
 	expBackoff := backoff.NewExponentialBackOff()
-	expBackoff.InitialInterval = 333 * time.Millisecond
+	expBackoff.InitialInterval = 1 * time.Second
 	expBackoff.Multiplier = 3
 	expBackoff.MaxInterval = 5 * time.Second
 	expBackoff.MaxElapsedTime = 11 * time.Second

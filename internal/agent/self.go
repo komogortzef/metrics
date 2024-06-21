@@ -52,10 +52,12 @@ func (sm *SelfMonitor) report(ctx ctx.Context) {
 			time.Sleep(time.Duration(sm.ReportInterval) * time.Second)
 			log.Debug("sending...")
 			sm.mtx.RLock()
-			if err := s.Retry(ctx, sm.sendBatch); err != nil {
-				log.Warn("Sending error", zap.Error(err))
-				sm.mtx.RUnlock()
-				continue
+			if err := sm.sendBatch(); err != nil {
+				if err = s.Retry(ctx, sm.sendBatch); err != nil {
+					log.Warn("Sending error", zap.Error(err))
+					sm.mtx.RUnlock()
+					continue
+				}
 			}
 			sm.pollCount = 0
 			sm.mtx.RUnlock()
