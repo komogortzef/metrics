@@ -37,9 +37,14 @@ func (mm *MetricManager) Run(cx ctx.Context) {
 		}
 		close(errChan)
 	}()
+
+	fs, isFs := mm.Store.(*FileStorage)
+	if isFs {
+		fs.dumpWait(cx)
+	}
 	select {
 	case <-cx.Done():
-		if fs, ok := mm.Store.(*FileStorage); ok {
+		if isFs {
 			if err := fs.dump(cx); err != nil {
 				log.Warn("couldn't dump to file", zap.Error(err))
 			}

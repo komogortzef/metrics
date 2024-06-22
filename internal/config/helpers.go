@@ -8,34 +8,26 @@ import (
 	c "metrics/internal/compress"
 	log "metrics/internal/logger"
 	"metrics/internal/server"
-	s "metrics/internal/service"
 
 	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 )
 
-func newStorage(cx ctx.Context, cfg *config) (store server.Storage, err error) {
+func newStorage(cx ctx.Context, cfg *config) (server.Storage, error) {
 	switch {
 	case cfg.DBAddress != "":
-		if store, err = server.NewDB(cx, cfg.DBAddress); err != nil {
+		db, err := server.NewDB(cx, cfg.DBAddress)
+		if err != nil {
 			return nil, fmt.Errorf("db configure error: %w", err)
 		}
-		cfg.FileStoragePath = s.NoStorage
+		return db, nil
 	case cfg.FileStoragePath != "":
-		fsStore := server.NewFileStore(cfg.FileStoragePath, cfg.StoreInterval)
+		fs := server.NewFileStore(cfg.FileStoragePath, cfg.StoreInterval)
 		if cfg.Restore {
-			if err := fsStore.RestoreFromFile(cx); err != nil {
-				log.Warn("restore from file error", zap.Error(err))
-			}
+			fs.RestoreFromFile(cx)
 		}
-		if !fsStore.SyncDump {
-			fsStore.DumpWait(cx, cfg.StoreInterval)
-		}
-		store = fsStore
-	default:
-		store = server.NewMemStore()
+		return fs, nil
 	}
-	return store, nil
+	return server.NewMemStore(), nil
 }
 
 func getRoutes(cx ctx.Context, m *server.MetricManager) *chi.Mux {

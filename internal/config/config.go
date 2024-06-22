@@ -68,13 +68,12 @@ func NewManager(cx ctx.Context, cfg *config) (*server.MetricManager, error) {
 }
 
 func NewMonitor(cfg *config) (*agent.SelfMonitor, error) {
-	monitor := &agent.SelfMonitor{
+	return &agent.SelfMonitor{
 		Mtx:            &sync.RWMutex{},
 		Address:        cfg.Address,
 		PollInterval:   cfg.PollInterval,
 		ReportInterval: cfg.ReportInterval,
-	}
-	return monitor, nil
+	}, nil
 }
 
 func CompletionCtx() (ctx.Context, ctx.CancelFunc) {

@@ -22,11 +22,14 @@ type config struct {
 
 type Option func(*config) error
 
-func EnvFlagsAgent(cfg *config) (err error) {
-	err = env.Parse(cfg)
-	if err != nil {
-		return fmt.Errorf("env parse error: %w", err)
+func WithEnv(cfg *config) (err error) {
+	if err = env.Parse(cfg); err != nil {
+		return fmt.Errorf("parse env err: %w", err)
 	}
+	return nil
+}
+
+func WithAgentFlags(cfg *config) (err error) {
 	addr := flag.String("a", s.DefaultEndpoint, "Endpoint arg: -a <host:port>")
 	poll := flag.Int("p", s.DefaultPollInterval, "Poll Interval arg: -p <sec>")
 	rep := flag.Int("r", s.DefaultReportInterval, "Report interval arg: -r <sec>")
@@ -43,11 +46,7 @@ func EnvFlagsAgent(cfg *config) (err error) {
 	return
 }
 
-func EnvFlagsServer(cfg *config) (err error) {
-	err = env.Parse(cfg)
-	if err != nil {
-		return fmt.Errorf("env parse error: %w", err)
-	}
+func WithServerFlags(cfg *config) (err error) {
 	addr := flag.String("a", s.DefaultEndpoint, "Endpoint arg: -a <host:port>")
 	storeInterv := flag.Int("i", s.DefaultStoreInterval, "Store interval arg: -i <sec>")
 	filePath := flag.String("f", s.DefaultStorePath, "File path arg: -f </path/to/file>")
