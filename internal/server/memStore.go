@@ -15,8 +15,8 @@ var ErrNoValue = errors.New("no such value in storage")
 
 type MemStorage struct {
 	items map[string]*s.Metrics
-	len   int
 	mtx   *sync.RWMutex
+	len   int
 }
 
 func NewMemStore() *MemStorage {
@@ -75,6 +75,7 @@ func (ms *MemStorage) Ping(_ ctx.Context) error {
 	log.Info("Memory storage is working...")
 	return nil
 }
+
 func (ms *MemStorage) Close() {
 	log.Info("Memory storage is closed;)")
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"metrics/internal/agent"
 	"metrics/internal/config"
 	"metrics/internal/logger"
 
@@ -12,12 +11,10 @@ func main() {
 	ctx, complete := config.CompletionCtx()
 	defer complete()
 
-	ag, err := config.Configure(ctx,
-		&agent.SelfMonitor{},
-		config.EnvFlagsAgent,
-	)
+	ag, err := config.Configure(ctx, config.Agent, config.EnvFlagsAgent)
 	if err != nil {
 		logger.Fatal("agent config error", zap.Error(err))
 	}
+
 	ag.Run(ctx)
 }

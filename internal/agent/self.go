@@ -14,13 +14,13 @@ import (
 )
 
 type SelfMonitor struct {
+	Mtx            *sync.RWMutex
+	Address        string
 	metrics        []s.Metrics
 	randVal        float64
 	pollCount      int64
-	Address        string `env:"ADDRESS" envDefault:"none"`
-	PollInterval   int    `env:"POLL_INTERVAL" envDefault:"-1"`
-	ReportInterval int    `env:"REPORT_INTERVAL" envDefault:"-1"`
-	mtx            *sync.RWMutex
+	PollInterval   int
+	ReportInterval int
 }
 
 func (sm *SelfMonitor) collect(cx ctx.Context) {
@@ -30,13 +30,13 @@ func (sm *SelfMonitor) collect(cx ctx.Context) {
 			log.Debug("Goodbye from collect")
 			return
 		default:
-			sm.mtx.Lock()
+			sm.Mtx.Lock()
 			runtime.ReadMemStats(&memStats)
 			sm.randVal = rand.Float64()
 			sm.pollCount++
 			sm.collectMetrics()
 			log.Debug("collect", zap.Int64("poll", sm.pollCount))
-			sm.mtx.Unlock()
+			sm.Mtx.Unlock()
 			time.Sleep(time.Duration(sm.PollInterval) * time.Second)
 		}
 	}
@@ -51,23 +51,22 @@ func (sm *SelfMonitor) report(cx ctx.Context) {
 		default:
 			time.Sleep(time.Duration(sm.ReportInterval) * time.Second)
 			log.Debug("sending...")
-			sm.mtx.RLock()
+			sm.Mtx.RLock()
 			if err := sm.sendBatch(); err != nil {
 				if err = s.Retry(cx, sm.sendBatch); err != nil {
 					log.Warn("Sending error", zap.Error(err))
-					sm.mtx.RUnlock()
+					sm.Mtx.RUnlock()
 					continue
 				}
 			}
 			sm.pollCount = 0
-			sm.mtx.RUnlock()
+			sm.Mtx.RUnlock()
 			log.Debug("Success sending!")
 		}
 	}
 }
 
 func (sm *SelfMonitor) Run(cx ctx.Context) {
-	sm.mtx = &sync.RWMutex{}
 	go sm.collect(cx)
 	go sm.report(cx)
 

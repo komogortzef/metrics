@@ -18,6 +18,7 @@ const (
 	insertMetric dbOperation = iota
 	selectMetric
 )
+
 const (
 	insertCounter = "insertCounter"
 	insertGauge   = "insertGauge"
@@ -30,9 +31,7 @@ type DataBase struct {
 	*pgxpool.Pool
 }
 
-var (
-	ErrConnDB = errors.New("db connection error")
-)
+var ErrConnDB = errors.New("db connection error")
 
 func NewDB(cx ctx.Context, addr string) (*DataBase, error) {
 	config, err := pgxpool.ParseConfig(addr)

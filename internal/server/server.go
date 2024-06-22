@@ -14,32 +14,38 @@ import (
 	"go.uber.org/zap"
 )
 
+type Storage interface {
+	Put(ctx.Context, *s.Metrics) (*s.Metrics, error)
+	Get(ctx.Context, *s.Metrics) (*s.Metrics, error)
+	List(ctx.Context) ([]*s.Metrics, error)
+	PutBatch(ctx.Context, []*s.Metrics) error
+	Ping(ctx.Context) error
+	Close()
+}
+
 type MetricManager struct {
-	Serv            *http.Server
-	Store           Storage
-	Address         string `env:"ADDRESS" envDefault:"none"`
-	StoreInterval   int    `env:"STORE_INTERVAL" envDefault:"-1"`
-	Restore         bool   `env:"RESTORE" envDefault:"true"`
-	FileStoragePath string
-	DBAddress       string `env:"DATABASE_DSN" envDefault:"none"`
+	Store Storage
+	http.Server
 }
 
 func (mm *MetricManager) Run(cx ctx.Context) {
 	errChan := make(chan error, 1)
 	go func() {
-		err := mm.Serv.ListenAndServe()
-		if err != nil && err != http.ErrServerClosed {
+		err := mm.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errChan <- err
 		}
 		close(errChan)
 	}()
 	select {
 	case <-cx.Done():
-		if mm.FileStoragePath != s.NoStorage {
-			_ = dump(cx, mm.FileStoragePath, mm.Store)
+		if fs, ok := mm.Store.(*FileStorage); ok {
+			if err := fs.dump(cx); err != nil {
+				log.Warn("couldn't dump to file", zap.Error(err))
+			}
 		}
 		mm.Store.Close()
-		if err := mm.Serv.Shutdown(cx); err != nil {
+		if err := mm.Shutdown(cx); err != nil {
 			log.Fatal("server shutdown err", zap.Error(err))
 		}
 		log.Debug("Goodbye!")
@@ -179,7 +185,6 @@ func (mm *MetricManager) BatchHandler(rw http.ResponseWriter, req *http.Request)
 		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
 		return
 	}
-
 	if err = mm.Store.PutBatch(req.Context(), metrics); err != nil {
 		log.Warn("UpdatesJSON(): couldn't send the batch", zap.Error(err))
 		http.Error(rw, s.InternalErrorMsg, http.StatusBadRequest)

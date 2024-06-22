@@ -16,6 +16,7 @@ func Debug(msg string, fields ...zapcore.Field) { // обертки:
 func Info(msg string, fields ...zapcore.Field) {
 	logger.Info(msg, fields...)
 }
+
 func Warn(msg string, fields ...zapcore.Field) {
 	logger.Warn(msg, fields...)
 }
