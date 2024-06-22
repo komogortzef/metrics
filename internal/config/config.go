@@ -4,8 +4,10 @@ import (
 	ctx "context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"metrics/internal/agent"
@@ -17,37 +19,69 @@ import (
 
 var ErrInvalidConfig = errors.New("invalid config")
 
-type Config interface {
+type Configurable interface {
 	Run(ctx.Context)
 }
 
-type Option func(ctx.Context, Config) error
+type AppType uint8
 
-func Configure(ctx ctx.Context, cfg Config, opts ...Option) (Config, error) {
+const (
+	Server AppType = iota
+	Agent
+)
+
+func Configure(cx ctx.Context, appType AppType, opts ...Option) (Configurable, error) {
 	err := log.InitLog()
 	if err != nil {
 		return nil, fmt.Errorf("init log: %w", err)
 	}
-	for _, opt := range opts {
-		if err := opt(ctx, cfg); err != nil {
+	cfg := &config{}
+	for _, op := range opts {
+		if err := op(cx, cfg); err != nil {
 			return nil, err
 		}
 	}
-	switch c := cfg.(type) {
-	case *server.MetricManager:
+	switch appType {
+	case Server:
 		log.Info("MetricManager configuration",
-			zap.String("addr", c.Address),
-			zap.Int("store interval", c.StoreInterval),
-			zap.Bool("restore", c.Restore),
-			zap.String("file store", c.FileStoragePath),
-			zap.String("database", c.DBAddress))
-	case *agent.SelfMonitor:
+			zap.String("addr", cfg.Address),
+			zap.Int("store interval", cfg.StoreInterval),
+			zap.Bool("restore", cfg.Restore),
+			zap.String("file store", cfg.FileStoragePath),
+			zap.String("database", cfg.DBAddress))
+		return NewManager(cx, cfg)
+	default:
 		log.Info("SelfMonitor configuration",
-			zap.String("addr", c.Address),
-			zap.Int("poll interval", c.PollInterval),
-			zap.Int("report interval", c.ReportInterval))
+			zap.String("addr", cfg.Address),
+			zap.Int("poll interval", cfg.PollInterval),
+			zap.Int("report interval", cfg.ReportInterval))
+		return NewMonitor(cx, cfg)
 	}
-	return cfg, nil
+}
+
+func NewManager(cx ctx.Context, ops *config) (*server.MetricManager, error) {
+	var err error
+	manager := &server.MetricManager{
+		Server: &http.Server{
+			Addr: ops.Address,
+		},
+	}
+	manager.Handler = getRoutes(cx, manager)
+	if manager.Store, err = newStorage(cx, ops); err != nil {
+		return nil, err
+	}
+	return manager, nil
+}
+
+func NewMonitor(cx ctx.Context, op *config) (*agent.SelfMonitor, error) {
+	monitor := &agent.SelfMonitor{
+		Mtx:            &sync.RWMutex{},
+		Address:        op.Address,
+		PollInterval:   op.PollInterval,
+		ReportInterval: op.ReportInterval,
+	}
+
+	return monitor, nil
 }
 
 func CompletionCtx() (ctx.Context, ctx.CancelFunc) {
