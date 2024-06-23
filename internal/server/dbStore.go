@@ -73,7 +73,7 @@ func connect(cx ctx.Context, db *DataBase) (*pgxpool.Conn, error) {
 	return conn, nil
 }
 
-func (db *DataBase) Put(cx ctx.Context, m *s.Metrics) (*s.Metrics, error) {
+func (db *DataBase) Put(cx ctx.Context, met *s.Metrics) (*s.Metrics, error) {
 	conn, err := connect(cx, db)
 	if err != nil {
 		return nil, fmt.Errorf("db put conn err: %w", err)
@@ -81,38 +81,28 @@ func (db *DataBase) Put(cx ctx.Context, m *s.Metrics) (*s.Metrics, error) {
 	defer conn.Release()
 
 	var val any
-	query := getQuery(insertMetric, m.MType)
-	if err = conn.QueryRow(cx, query, m.ToSlice()...).Scan(&val); err != nil {
+	query := getQuery(insertMetric, met)
+	if err = conn.QueryRow(cx, query, met.ToSlice()...).Scan(&val); err != nil {
 		return nil, fmt.Errorf("db put queryRow error: %w", err)
 	}
-	if v, ok := val.(int64); ok {
-		m.Delta = &v
-	} else {
-		v, _ := val.(float64)
-		m.Value = &v
-	}
-	return m, nil
+	setVal(met, val)
+	return met, nil
 }
 
-func (db *DataBase) Get(cx ctx.Context, m *s.Metrics) (*s.Metrics, error) {
+func (db *DataBase) Get(cx ctx.Context, met *s.Metrics) (*s.Metrics, error) {
 	conn, err := connect(cx, db)
 	if err != nil {
 		return nil, fmt.Errorf("db get conn err: %w", err)
 	}
 	defer conn.Release()
 
-	query := getQuery(selectMetric, m.MType)
+	query := getQuery(selectMetric, met)
 	var val any
-	if err = conn.QueryRow(cx, query, m.ID).Scan(&val); err != nil {
+	if err = conn.QueryRow(cx, query, met.ID).Scan(&val); err != nil {
 		return nil, fmt.Errorf("db get failed to execute query: %w", err)
 	}
-	if v, ok := val.(int64); ok {
-		m.Delta = &v
-	} else {
-		v, _ := val.(float64)
-		m.Value = &v
-	}
-	return m, nil
+	setVal(met, val)
+	return met, nil
 }
 
 func (db *DataBase) List(cx ctx.Context) (metrics []*s.Metrics, err error) {
@@ -133,12 +123,7 @@ func (db *DataBase) List(cx ctx.Context) (metrics []*s.Metrics, err error) {
 		if err != nil {
 			return nil, fmt.Errorf("dbList query scan err: %w", err)
 		}
-		if v, ok := val.(int64); ok {
-			met.Delta = &v
-		} else {
-			v, _ := val.(float64)
-			met.Value = &v
-		}
+		setVal(&met, val)
 		metrics = append(metrics, &met)
 	}
 	return metrics, nil
@@ -155,10 +140,11 @@ func (db *DataBase) PutBatch(cx ctx.Context, mets []*s.Metrics) error {
 	if err != nil {
 		return fmt.Errorf("failed transaction beginning: %w", err)
 	}
-	defer tx.Rollback(cx)
+	defer func() { _ = tx.Rollback(cx) }()
+
 	batch := &pgx.Batch{}
-	for _, m := range mets {
-		batch.Queue(getQuery(insertMetric, m.MType), m.ToSlice()...)
+	for _, met := range mets {
+		batch.Queue(getQuery(insertMetric, met), met.ToSlice()...)
 	}
 	br := tx.SendBatch(cx, batch)
 	if _, err := br.Exec(); err != nil {

@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type Configurable interface {
+type Executable interface {
 	Run(ctx.Context)
 }
 
@@ -27,7 +27,7 @@ const (
 	Agent
 )
 
-func Configure(cx ctx.Context, appType AppType, opts ...Option) (Configurable, error) {
+func Configure(cx ctx.Context, appType AppType, opts ...Option) (Executable, error) {
 	err := log.InitLog()
 	if err != nil {
 		return nil, fmt.Errorf("init log: %w", err)
@@ -61,10 +61,8 @@ func NewManager(cx ctx.Context, cfg *config) (*server.MetricManager, error) {
 	manager := &server.MetricManager{Server: http.Server{}}
 	manager.Addr = cfg.Address
 	manager.Handler = getRoutes(cx, manager)
-	if manager.Store, err = newStorage(cx, cfg); err != nil {
-		return nil, err
-	}
-	return manager, nil
+	manager.Storage, err = setStorage(cx, cfg)
+	return manager, err
 }
 
 func NewMonitor(cfg *config) (*agent.SelfMonitor, error) {

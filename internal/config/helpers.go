@@ -12,7 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func newStorage(cx ctx.Context, cfg *config) (server.Storage, error) {
+func setStorage(cx ctx.Context, cfg *config) (server.Storage, error) {
 	switch {
 	case cfg.DBAddress != "":
 		db, err := server.NewDB(cx, cfg.DBAddress)

@@ -5,9 +5,18 @@ import (
 	"fmt"
 	"os"
 
-	s "metrics/internal/service"
-
 	"github.com/caarlos0/env/v11"
+)
+
+const (
+	defaultEndpoint       = "localhost:8080"
+	defaultPollInterval   = 2
+	defaultReportInterval = 10
+	defaultStoreInterval  = 300
+	defaultStorePath      = "/tmp/metrics-db.json"
+	defaultRestore        = true
+	defaultSendMode       = "text"
+	noStorage             = ""
 )
 
 type config struct {
@@ -30,9 +39,9 @@ func WithEnv(cfg *config) (err error) {
 }
 
 func WithAgentFlags(cfg *config) (err error) {
-	addr := flag.String("a", s.DefaultEndpoint, "Endpoint arg: -a <host:port>")
-	poll := flag.Int("p", s.DefaultPollInterval, "Poll Interval arg: -p <sec>")
-	rep := flag.Int("r", s.DefaultReportInterval, "Report interval arg: -r <sec>")
+	addr := flag.String("a", defaultEndpoint, "Endpoint arg: -a <host:port>")
+	poll := flag.Int("p", defaultPollInterval, "Poll Interval arg: -p <sec>")
+	rep := flag.Int("r", defaultReportInterval, "Report interval arg: -r <sec>")
 	flag.Parse()
 	if cfg.Address == "none" {
 		cfg.Address = *addr
@@ -47,11 +56,11 @@ func WithAgentFlags(cfg *config) (err error) {
 }
 
 func WithServerFlags(cfg *config) (err error) {
-	addr := flag.String("a", s.DefaultEndpoint, "Endpoint arg: -a <host:port>")
-	storeInterv := flag.Int("i", s.DefaultStoreInterval, "Store interval arg: -i <sec>")
-	filePath := flag.String("f", s.DefaultStorePath, "File path arg: -f </path/to/file>")
-	rest := flag.Bool("r", s.DefaultRestore, "Restore storage arg: -r <true|false>")
-	dbAddr := flag.String("d", s.NoStorage, "DB address arg: -d <dbserver://username:password@host:port/db_name>")
+	addr := flag.String("a", defaultEndpoint, "Endpoint arg: -a <host:port>")
+	storeInterv := flag.Int("i", defaultStoreInterval, "Store interval arg: -i <sec>")
+	filePath := flag.String("f", defaultStorePath, "File path arg: -f </path/to/file>")
+	rest := flag.Bool("r", defaultRestore, "Restore storage arg: -r <true|false>")
+	dbAddr := flag.String("d", noStorage, "DB address arg: -d <dbserver://username:password@host:port/db_name>")
 	flag.Parse()
 	if cfg.Address == "none" {
 		cfg.Address = *addr
