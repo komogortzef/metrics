@@ -12,6 +12,8 @@ import (
 	"github.com/pquerna/ffjson/ffjson"
 )
 
+const permissions = 0o6000
+
 type FileStorage struct {
 	MemStorage
 	FilePath string
@@ -75,10 +77,10 @@ func (fs *FileStorage) dump(cx ctx.Context) error {
 	if err != nil {
 		return fmt.Errorf("dump err: %w", err)
 	}
-	err = os.WriteFile(fs.FilePath, metBytes, 0o666)
+	err = os.WriteFile(fs.FilePath, metBytes, permissions)
 	if err != nil && !os.IsPermission(err) {
 		err = s.Retry(cx, func() error {
-			return os.WriteFile(fs.FilePath, metBytes, 0o666)
+			return os.WriteFile(fs.FilePath, metBytes, permissions)
 		})
 	}
 	if err != nil {

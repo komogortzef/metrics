@@ -39,13 +39,14 @@ func getRoutes(cx ctx.Context, m *server.MetricManager) *chi.Mux {
 	}
 	router := chi.NewRouter()
 	router.Use(log.WithHandlerLog)
-	router.Get("/", ctxMiddleware(c.GzipMiddleware(m.GetAllHandler)))
+	router.Use(c.GzipMiddleware)
+	router.Get("/", ctxMiddleware(m.GetAllHandler))
 	router.Get("/ping", ctxMiddleware(m.PingHandler))
-	router.Post("/value/", ctxMiddleware(c.GzipMiddleware(m.GetJSON)))
+	router.Post("/value/", ctxMiddleware(m.GetJSON))
 	router.Get("/value/{type}/{id}", ctxMiddleware(m.GetHandler))
-	router.Post("/update/", ctxMiddleware(c.GzipMiddleware(m.UpdateJSON)))
+	router.Post("/update/", ctxMiddleware(m.UpdateJSON))
 	router.Post("/update/{type}/{id}/{value}", ctxMiddleware(m.UpdateHandler))
-	router.Post("/updates/", ctxMiddleware(c.GzipMiddleware(m.BatchHandler)))
+	router.Post("/updates/", ctxMiddleware(m.BatchHandler))
 
 	return router
 }
