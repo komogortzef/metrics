@@ -14,6 +14,12 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	internalErrorMsg  = "internal server error"
+	notFoundMessage   = "not found"
+	badRequestMessage = "bad request"
+)
+
 type Storage interface {
 	Put(ctx.Context, *s.Metrics) (*s.Metrics, error)
 	Get(ctx.Context, *s.Metrics) (*s.Metrics, error)
@@ -24,7 +30,7 @@ type Storage interface {
 }
 
 type MetricManager struct {
-	Store Storage
+	Storage
 	http.Server
 }
 
@@ -38,7 +44,7 @@ func (mm *MetricManager) Run(cx ctx.Context) {
 		close(errChan)
 	}()
 
-	fs, isFs := mm.Store.(*FileStorage)
+	fs, isFs := mm.Storage.(*FileStorage)
 	if isFs {
 		fs.dumpWait(cx)
 	}
@@ -49,7 +55,7 @@ func (mm *MetricManager) Run(cx ctx.Context) {
 				log.Warn("couldn't dump to file", zap.Error(err))
 			}
 		}
-		mm.Store.Close()
+		mm.Storage.Close()
 		if err := mm.Shutdown(cx); err != nil {
 			log.Fatal("server shutdown err", zap.Error(err))
 		}
@@ -64,12 +70,12 @@ func (mm *MetricManager) UpdateHandler(rw http.ResponseWriter, req *http.Request
 	metric, err := s.NewMetric(mtype, name, value)
 	if err != nil {
 		log.Warn("NewMetric error", zap.Error(err))
-		http.Error(rw, s.BadRequestMessage, http.StatusBadRequest)
+		http.Error(rw, badRequestMessage, http.StatusBadRequest)
 		return
 	}
-	if _, err = mm.Store.Put(req.Context(), metric); err != nil {
+	if _, err = mm.Put(req.Context(), metric); err != nil {
 		log.Warn("UpdateHandler(): storage error", zap.Error(err))
-		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
+		http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
 		return
 	}
 	rw.WriteHeader(http.StatusOK)
@@ -78,18 +84,18 @@ func (mm *MetricManager) UpdateHandler(rw http.ResponseWriter, req *http.Request
 func (mm *MetricManager) GetHandler(rw http.ResponseWriter, req *http.Request) {
 	mtype, name, _ := processURL(req.URL.Path)
 	met := &s.Metrics{ID: name, MType: mtype}
-	metric, err := mm.Store.Get(req.Context(), met)
+	metric, err := mm.Get(req.Context(), met)
 	if errors.Is(err, ErrConnDB) {
 		log.Warn("GetHandler(): storage error", zap.Error(err))
-		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
+		http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
 		return
 	} else if err != nil {
 		log.Warn("GetHandler(): Coundn't fetch the metric from store", zap.Error(err))
-		http.Error(rw, s.NotFoundMessage, http.StatusNotFound)
+		http.Error(rw, notFoundMessage, http.StatusNotFound)
 		return
 	}
 	var numStr string
-	if mtype == s.Counter {
+	if metric.IsCounter() {
 		numStr = strconv.FormatInt(*metric.Delta, 10)
 	} else {
 		numStr = strconv.FormatFloat(*metric.Value, 'f', -1, 64)
@@ -100,10 +106,10 @@ func (mm *MetricManager) GetHandler(rw http.ResponseWriter, req *http.Request) {
 
 func (mm *MetricManager) GetAllHandler(rw http.ResponseWriter, req *http.Request) {
 	list := make([]Item, 0, metricsNumber)
-	metrics, err := mm.Store.List(req.Context())
+	metrics, err := mm.List(req.Context())
 	if errors.Is(err, ErrConnDB) {
 		log.Warn("GetAllHandler(): storage error", zap.Error(err))
-		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
+		http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
 		return
 	}
 	for _, m := range metrics {
@@ -112,7 +118,7 @@ func (mm *MetricManager) GetAllHandler(rw http.ResponseWriter, req *http.Request
 	html, err := renderGetAll(list)
 	if err != nil {
 		log.Warn("GetAllHandler(): An error occured during html rendering")
-		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
+		http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
 		return
 	}
 	rw.Header().Set("Content-Type", "text/html")
@@ -129,9 +135,9 @@ func (mm *MetricManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) {
 
 	metric := &s.Metrics{}
 	_ = metric.UnmarshalJSON(bytes)
-	if metric, err = mm.Store.Put(req.Context(), metric); err != nil {
+	if metric, err = mm.Put(req.Context(), metric); err != nil {
 		log.Warn("UpdateJSON(): couldn't write to store", zap.Error(err))
-		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
+		http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
 		return
 	}
 	bytes, _ = metric.MarshalJSON()
@@ -143,20 +149,20 @@ func (mm *MetricManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 	bytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		log.Warn("GetJSON(): Couldn't read request body")
-		http.Error(rw, s.BadRequestMessage, http.StatusBadRequest)
+		http.Error(rw, badRequestMessage, http.StatusBadRequest)
 		return
 	}
 	defer req.Body.Close()
 
 	metric := &s.Metrics{}
 	_ = metric.UnmarshalJSON(bytes)
-	if metric, err = mm.Store.Get(req.Context(), metric); errors.Is(err, ErrConnDB) {
+	if metric, err = mm.Get(req.Context(), metric); errors.Is(err, ErrConnDB) {
 		log.Warn("GetJSON(): store error", zap.Error(err))
-		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
+		http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
 		return
 	} else if err != nil {
 		log.Warn("GetJSON(): No such metric in store", zap.Error(err))
-		http.Error(rw, s.NotFoundMessage, http.StatusNotFound)
+		http.Error(rw, notFoundMessage, http.StatusNotFound)
 		return
 	}
 	bytes, _ = metric.MarshalJSON()
@@ -166,9 +172,9 @@ func (mm *MetricManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (mm *MetricManager) PingHandler(rw http.ResponseWriter, req *http.Request) {
-	if err := mm.Store.Ping(req.Context()); err != nil {
+	if err := mm.Ping(req.Context()); err != nil {
 		log.Warn("ping error", zap.Error(err))
-		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
+		http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
 		return
 	}
 	rw.WriteHeader(http.StatusOK)
@@ -179,7 +185,7 @@ func (mm *MetricManager) BatchHandler(rw http.ResponseWriter, req *http.Request)
 	b, err := io.ReadAll(req.Body)
 	if err != nil {
 		log.Warn("UpdatesJSON(): Couldn't read request body")
-		http.Error(rw, s.BadRequestMessage, http.StatusBadRequest)
+		http.Error(rw, badRequestMessage, http.StatusBadRequest)
 		return
 	}
 	defer req.Body.Close()
@@ -187,12 +193,12 @@ func (mm *MetricManager) BatchHandler(rw http.ResponseWriter, req *http.Request)
 	var metrics []*s.Metrics
 	if err = ffjson.Unmarshal(b, &metrics); err != nil {
 		log.Warn("batchHandler(): unmarshal error", zap.Error(err))
-		http.Error(rw, s.InternalErrorMsg, http.StatusInternalServerError)
+		http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
 		return
 	}
-	if err = mm.Store.PutBatch(req.Context(), metrics); err != nil {
+	if err = mm.PutBatch(req.Context(), metrics); err != nil {
 		log.Warn("UpdatesJSON(): couldn't send the batch", zap.Error(err))
-		http.Error(rw, s.InternalErrorMsg, http.StatusBadRequest)
+		http.Error(rw, internalErrorMsg, http.StatusBadRequest)
 		return
 	}
 	rw.WriteHeader(http.StatusOK)

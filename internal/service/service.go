@@ -13,23 +13,8 @@ import (
 )
 
 const ( // часто используемые строковые литералы в виде констант
-	DefaultEndpoint       = "localhost:8080"
-	DefaultPollInterval   = 2
-	DefaultReportInterval = 10
-	DefaultStoreInterval  = 300
-	DefaultStorePath      = "/tmp/metrics-db.json"
-	DefaultRestore        = true
-	DefaultSendMode       = "text"
-	NoStorage             = ""
-	InternalErrorMsg      = "internal server error"
-	NotFoundMessage       = "not found"
-	BadRequestMessage     = "bad request"
-	Gauge                 = "gauge"
-	Counter               = "counter"
-	Mtype                 = "type"
-	ID                    = "id"
-	Value                 = "value"
-	Delta                 = "delta"
+	gauge   = "gauge"
+	counter = "counter"
 )
 
 var (
@@ -46,26 +31,24 @@ type Metrics struct {
 }
 
 func NewMetric(mtype, id string, val string) (*Metrics, error) {
-	var metric Metrics
-	if mtype != Counter && mtype != Gauge {
-		return &metric, ErrInvalidType
+	met := &Metrics{ID: id, MType: mtype}
+	if !met.IsCounter() && !met.IsGauge() {
+		return nil, ErrInvalidType
 	}
-	metric.MType = mtype
-	metric.ID = id
-	if mtype == Counter {
+	if met.IsCounter() {
 		num, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
-			return &metric, ErrInvalidVal
+			return met, ErrInvalidVal
 		}
-		metric.Delta = &num
+		met.Delta = &num
 	} else {
 		num, err := strconv.ParseFloat(val, 64)
 		if err != nil {
-			return &metric, ErrInvalidVal
+			return met, ErrInvalidVal
 		}
-		metric.Value = &num
+		met.Value = &num
 	}
-	return &metric, nil
+	return met, nil
 }
 
 func BuildMetric(name string, val any) Metrics {
@@ -73,10 +56,10 @@ func BuildMetric(name string, val any) Metrics {
 	metric.ID = name
 	switch v := val.(type) {
 	case float64:
-		metric.MType = Gauge
+		metric.MType = gauge
 		metric.Value = &v
 	case int64:
-		metric.MType = Counter
+		metric.MType = counter
 		metric.Delta = &v
 	}
 
@@ -87,7 +70,7 @@ func (met Metrics) String() string {
 	if met.Delta == nil && met.Value == nil {
 		return fmt.Sprintf(" (%s: <empty>)", met.ID)
 	}
-	if met.MType == Counter {
+	if met.IsCounter() {
 		return fmt.Sprintf(" (%s: %d)", met.ID, *met.Delta)
 	}
 	return fmt.Sprintf(" (%s: %g)", met.ID, *met.Value)
@@ -97,7 +80,7 @@ func (met *Metrics) MergeMetrics(met2 *Metrics) {
 	if met2 == nil {
 		return
 	}
-	if met2.MType == Counter {
+	if met2.IsCounter() {
 		if met2.Delta == nil {
 			return
 		}
@@ -107,10 +90,18 @@ func (met *Metrics) MergeMetrics(met2 *Metrics) {
 }
 
 func (met Metrics) ToSlice() []any {
-	if met.MType == Counter {
+	if met.IsCounter() {
 		return []any{met.ID, *met.Delta}
 	}
 	return []any{met.ID, *met.Value}
+}
+
+func (met *Metrics) IsGauge() bool {
+	return met.MType == gauge
+}
+
+func (met *Metrics) IsCounter() bool {
+	return met.MType == counter
 }
 
 func Retry(cx ctx.Context, fn func() error) error {
