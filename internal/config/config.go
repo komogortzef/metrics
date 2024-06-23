@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type Configurable interface {
+type Executable interface {
 	Run(ctx.Context)
 }
 
@@ -27,7 +27,7 @@ const (
 	Agent
 )
 
-func Configure(cx ctx.Context, appType AppType, opts ...Option) (Configurable, error) {
+func Configure(cx ctx.Context, appType AppType, opts ...Option) (Executable, error) {
 	err := log.InitLog()
 	if err != nil {
 		return nil, fmt.Errorf("init log: %w", err)
