@@ -159,18 +159,6 @@ func (db *DataBase) PutBatch(cx ctx.Context, mets []*s.Metrics) error {
 	return nil
 }
 
-func (db *DataBase) Ping(cx ctx.Context) error {
-	if err := db.Pool.Ping(cx); err != nil {
-		return fmt.Errorf("ping err: %w", err)
-	}
-	return nil
-}
-
-func (db *DataBase) Close() {
-	db.Pool.Close()
-	log.Info("DataBase connection is closed")
-}
-
 func prepareQueries(cx ctx.Context, pool *pgxpool.Pool) error {
 	conn, err := pool.Acquire(cx)
 	if err != nil {

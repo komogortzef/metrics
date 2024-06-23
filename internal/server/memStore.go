@@ -71,11 +71,6 @@ func (ms *MemStorage) PutBatch(cx ctx.Context, mets []*s.Metrics) error {
 	return nil
 }
 
-func (ms *MemStorage) Ping(_ ctx.Context) error {
-	log.Info("Memory storage is working...")
-	return nil
-}
-
 func (ms *MemStorage) Close() {
 	log.Info("Memory storage is closed;)")
 }

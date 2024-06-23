@@ -25,7 +25,6 @@ type Storage interface {
 	Get(ctx.Context, *s.Metrics) (*s.Metrics, error)
 	List(ctx.Context) ([]*s.Metrics, error)
 	PutBatch(ctx.Context, []*s.Metrics) error
-	Ping(ctx.Context) error
 	Close()
 }
 
@@ -170,10 +169,12 @@ func (mm *MetricManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (mm *MetricManager) PingHandler(rw http.ResponseWriter, req *http.Request) {
-	if err := mm.Ping(req.Context()); err != nil {
-		log.Warn("ping error", zap.Error(err))
-		http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
-		return
+	if db, ok := mm.Storage.(*DataBase); ok {
+		if err := db.Ping(req.Context()); err != nil {
+			log.Warn("ping error", zap.Error(err))
+			http.Error(rw, internalErrorMsg, http.StatusInternalServerError)
+			return
+		}
 	}
 	rw.WriteHeader(http.StatusOK)
 	_, _ = rw.Write([]byte("The connection is established!"))
