@@ -7,6 +7,7 @@ import (
 
 	c "metrics/internal/compress"
 	log "metrics/internal/logger"
+	sec "metrics/internal/security"
 	"metrics/internal/server"
 
 	"github.com/go-chi/chi/v5"
@@ -30,7 +31,7 @@ func setStorage(cx ctx.Context, cfg *config) (server.Storage, error) {
 	return server.NewMemStore(), nil
 }
 
-func getRoutes(cx ctx.Context, m *server.MetricManager) *chi.Mux {
+func getRoutes(cx ctx.Context, m *server.MetricManager, cfg *config) *chi.Mux {
 	ctxMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			r = r.WithContext(cx)
@@ -42,11 +43,11 @@ func getRoutes(cx ctx.Context, m *server.MetricManager) *chi.Mux {
 	router.Use(c.GzipMiddleware)
 	router.Get("/", ctxMiddleware(m.GetAllHandler))
 	router.Get("/ping", ctxMiddleware(m.PingHandler))
-	router.Post("/value/", ctxMiddleware(m.GetJSON))
+	router.Post("/value/", ctxMiddleware(sec.HashMiddleware(cfg.Key, m.GetJSON)))
 	router.Get("/value/{type}/{id}", ctxMiddleware(m.GetHandler))
-	router.Post("/update/", ctxMiddleware(m.UpdateJSON))
+	router.Post("/update/", ctxMiddleware(sec.HashMiddleware(cfg.Key, m.UpdateJSON)))
 	router.Post("/update/{type}/{id}/{value}", ctxMiddleware(m.UpdateHandler))
-	router.Post("/updates/", ctxMiddleware(m.BatchHandler))
+	router.Post("/updates/", ctxMiddleware(sec.HashMiddleware(cfg.Key, m.BatchHandler)))
 
 	return router
 }

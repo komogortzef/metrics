@@ -124,6 +124,7 @@ func (mm *MetricManager) GetAllHandler(rw http.ResponseWriter, req *http.Request
 }
 
 func (mm *MetricManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) {
+	log.Debug("UpdateJSON...")
 	bytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		log.Warn("Couldn't read with decompress")
@@ -143,6 +144,7 @@ func (mm *MetricManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (mm *MetricManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
+	log.Debug("GetJSON...")
 	bytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		log.Warn("GetJSON(): Couldn't read request body")
@@ -181,9 +183,10 @@ func (mm *MetricManager) PingHandler(rw http.ResponseWriter, req *http.Request) 
 }
 
 func (mm *MetricManager) BatchHandler(rw http.ResponseWriter, req *http.Request) {
+	log.Debug("BatchHandler...")
 	b, err := io.ReadAll(req.Body)
 	if err != nil {
-		log.Warn("UpdatesJSON(): Couldn't read request body")
+		log.Warn("BatchHandler(): Couldn't read request body")
 		http.Error(rw, badRequestMessage, http.StatusBadRequest)
 		return
 	}

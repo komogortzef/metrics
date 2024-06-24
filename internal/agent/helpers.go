@@ -2,11 +2,13 @@ package agent
 
 import (
 	"bytes"
+	ctx "context"
 	"fmt"
 	"net/http"
 	"runtime"
 
 	"metrics/internal/compress"
+	"metrics/internal/security"
 	s "metrics/internal/service"
 
 	"github.com/pquerna/ffjson/ffjson"
@@ -48,9 +50,7 @@ func (sm *SelfMonitor) collectMetrics() {
 	}
 }
 
-func hash(val []byte, key string) {}
-
-func (sm *SelfMonitor) sendBatch() error {
+func (sm *SelfMonitor) sendBatch(cx ctx.Context) error {
 	url := "http://" + sm.Address + "/updates/"
 	data, err := ffjson.Marshal(sm.metrics)
 	if err != nil {
@@ -60,15 +60,33 @@ func (sm *SelfMonitor) sendBatch() error {
 	if err != nil {
 		return fmt.Errorf("sendBatch compress err: %w", err)
 	}
+
 	req, _ := http.NewRequest(http.MethodPost, url, bytes.NewReader(compressData))
+	if sm.Key != "" {
+		sign := security.Hash(&data, sm.Key)
+		req.Header.Set("HashSHA256", sign)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
+
 	r, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("sendBatch client error: %w", err)
+		if err = s.Retry(cx, func() error {
+			r2, err := http.DefaultClient.Do(req)
+			closeBody(r2)
+			return err
+		}); err != nil {
+			closeBody(r)
+			return fmt.Errorf("sendBatch client error: %w", err)
+		}
 	}
+	closeBody(r)
+	return nil
+}
+
+func closeBody(r *http.Response) {
 	if r != nil && r.Body != nil {
 		r.Body.Close()
 	}
-	return nil
+
 }
