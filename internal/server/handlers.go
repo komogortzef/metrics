@@ -43,19 +43,21 @@ func (mm *MetricManager) Run(cx ctx.Context) {
 		close(errChan)
 	}()
 
-	fs, isFs := mm.Storage.(*FileStorage)
-	if isFs {
-		fs.dumpWait(cx)
+	dumpWaitDone := make(chan struct{})
+	fileStore, isFileStore := mm.Storage.(*FileStorage)
+	if isFileStore {
+		fileStore.dumpWait(cx, dumpWaitDone)
 	}
 	select {
 	case <-cx.Done():
-		if isFs {
-			if err := fs.dump(cx); err != nil {
+		if isFileStore {
+			if err := fileStore.dump(cx); err != nil {
 				log.Warn("couldn't dump to file", zap.Error(err))
 			}
+			<-dumpWaitDone
 		}
-		mm.Storage.Close()
 		_ = mm.Shutdown(cx)
+		mm.Storage.Close()
 		log.Debug("Goodbye!")
 	case err := <-errChan:
 		log.Fatal("server running error", zap.Error(err))
@@ -124,6 +126,7 @@ func (mm *MetricManager) GetAllHandler(rw http.ResponseWriter, req *http.Request
 }
 
 func (mm *MetricManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) {
+	log.Debug("UpdateJSON...")
 	bytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		log.Warn("Couldn't read with decompress")
@@ -143,6 +146,7 @@ func (mm *MetricManager) UpdateJSON(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (mm *MetricManager) GetJSON(rw http.ResponseWriter, req *http.Request) {
+	log.Debug("GetJSON...")
 	bytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		log.Warn("GetJSON(): Couldn't read request body")
@@ -181,9 +185,10 @@ func (mm *MetricManager) PingHandler(rw http.ResponseWriter, req *http.Request) 
 }
 
 func (mm *MetricManager) BatchHandler(rw http.ResponseWriter, req *http.Request) {
+	log.Debug("BatchHandler...")
 	b, err := io.ReadAll(req.Body)
 	if err != nil {
-		log.Warn("UpdatesJSON(): Couldn't read request body")
+		log.Warn("BatchHandler(): Couldn't read request body")
 		http.Error(rw, badRequestMessage, http.StatusBadRequest)
 		return
 	}

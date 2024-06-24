@@ -75,7 +75,7 @@ func NewManager(cx ctx.Context, cfg *config) (*server.MetricManager, error) {
 	var err error
 	manager := &server.MetricManager{Server: http.Server{}}
 	manager.Addr = cfg.Address
-	manager.Handler = getRoutes(cx, manager)
+	manager.Handler = getRoutes(cx, manager, cfg)
 	manager.Storage, err = setStorage(cx, cfg)
 	return manager, err
 }
@@ -86,6 +86,7 @@ func NewMonitor(cfg *config) (*agent.SelfMonitor, error) {
 		Address:        cfg.Address,
 		PollInterval:   cfg.PollInterval,
 		ReportInterval: cfg.ReportInterval,
+		Key:            cfg.Key,
 	}, nil
 }
 

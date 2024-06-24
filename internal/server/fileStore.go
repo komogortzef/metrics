@@ -10,6 +10,7 @@ import (
 	s "metrics/internal/service"
 
 	"github.com/pquerna/ffjson/ffjson"
+	"go.uber.org/zap"
 )
 
 const permissions = 0o6000
@@ -48,6 +49,10 @@ func (fs *FileStorage) PutBatch(cx ctx.Context, mets []*s.Metrics) error {
 	return nil
 }
 
+func (fs *FileStorage) Close() {
+	log.Info("File storage is closed;)")
+}
+
 func (fs *FileStorage) RestoreFromFile(cx ctx.Context) {
 	b, err := os.ReadFile(fs.FilePath)
 	if err != nil && !os.IsPermission(err) && !os.IsNotExist(err) {
@@ -55,14 +60,17 @@ func (fs *FileStorage) RestoreFromFile(cx ctx.Context) {
 			b, err = os.ReadFile(fs.FilePath)
 			return err
 		}); err != nil {
+			log.Warn("RestoreFromFile: err after retry", zap.Error(err))
 			return
 		}
 	}
 	if err != nil {
+		log.Warn("RestoreFromFile", zap.Error(err))
 		return
 	}
 	var mets []*s.Metrics
 	if err := ffjson.Unmarshal(b, &mets); err != nil {
+		log.Warn("RestoreFromFile: unmarshall error", zap.Error(err))
 		return
 	}
 	for _, m := range mets {
@@ -75,7 +83,7 @@ func (fs *FileStorage) dump(cx ctx.Context) error {
 	items, _ := fs.List(cx)
 	metBytes, err := ffjson.Marshal(items)
 	if err != nil {
-		return fmt.Errorf("dump err: %w", err)
+		return fmt.Errorf("dump: %w", err)
 	}
 	err = os.WriteFile(fs.FilePath, metBytes, permissions)
 	if err != nil && !os.IsPermission(err) {
@@ -84,13 +92,13 @@ func (fs *FileStorage) dump(cx ctx.Context) error {
 		})
 	}
 	if err != nil {
-		return fmt.Errorf("dump error: %w", err)
+		return fmt.Errorf("dump: %w", err)
 	}
 	log.Debug("success dump!")
 	return nil
 }
 
-func (fs *FileStorage) dumpWait(cx ctx.Context) {
+func (fs *FileStorage) dumpWait(cx ctx.Context, dumpWaitDone chan struct{}) {
 	if fs.interval <= 0 {
 		return
 	}
@@ -101,10 +109,14 @@ func (fs *FileStorage) dumpWait(cx ctx.Context) {
 			select {
 			case <-ticker.C:
 				if err := fs.dump(cx); err != nil {
-					log.Warn("fs.dumpWithinterval(): Couldn't save data to file")
+					log.Warn("fs.dumpWithinterval(): Couldn't save data to file",
+						zap.Error(err))
+					close(dumpWaitDone)
 					return
 				}
 			case <-cx.Done():
+				log.Debug("dumpWait is done...")
+				close(dumpWaitDone)
 				return
 			}
 		}

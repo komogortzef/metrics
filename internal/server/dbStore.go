@@ -97,12 +97,14 @@ func (db *DataBase) List(cx ctx.Context) (metrics []*s.Metrics, err error) {
 	for rows.Next() {
 		var met s.Metrics
 		var val any
-		err := rows.Scan(&met.ID, &val)
-		if err != nil {
+		if err := rows.Scan(&met.ID, &val); err != nil {
 			return nil, fmt.Errorf("dbList query scan err: %w", err)
 		}
 		setVal(&met, val)
 		metrics = append(metrics, &met)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("dbList query rows error: %w", err)
 	}
 	return metrics, nil
 }

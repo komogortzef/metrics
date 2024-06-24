@@ -16,6 +16,7 @@ import (
 type SelfMonitor struct {
 	Mtx            *sync.RWMutex
 	Address        string
+	Key            string
 	metrics        []s.Metrics
 	randVal        float64
 	pollCount      int64
@@ -52,12 +53,10 @@ func (sm *SelfMonitor) report(cx ctx.Context) {
 			time.Sleep(time.Duration(sm.ReportInterval) * time.Second)
 			log.Debug("sending...")
 			sm.Mtx.RLock()
-			if err := sm.sendBatch(); err != nil {
-				if err = s.Retry(cx, sm.sendBatch); err != nil {
-					log.Warn("Sending error", zap.Error(err))
-					sm.Mtx.RUnlock()
-					continue
-				}
+			if err := sm.sendBatch(cx); err != nil {
+				log.Warn("Sending error", zap.Error(err))
+				sm.Mtx.RUnlock()
+				continue
 			}
 			sm.pollCount = 0
 			sm.Mtx.RUnlock()

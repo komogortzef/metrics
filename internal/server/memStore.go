@@ -62,11 +62,16 @@ func (ms *MemStorage) List(_ ctx.Context) ([]*s.Metrics, error) {
 }
 
 func (ms *MemStorage) PutBatch(cx ctx.Context, mets []*s.Metrics) error {
-	for _, metric := range mets {
-		if _, err := ms.Put(cx, metric); err != nil {
-			return err
+	ms.mtx.Lock()
+	for _, met := range mets {
+		oldMet, exists := ms.items[met.ID]
+		met.MergeMetrics(oldMet)
+		ms.items[met.ID] = met
+		if !exists {
+			ms.len++
 		}
 	}
+	ms.mtx.Unlock()
 	return nil
 }
 
