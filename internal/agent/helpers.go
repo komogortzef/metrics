@@ -48,6 +48,8 @@ func (sm *SelfMonitor) collectMetrics() {
 	}
 }
 
+func hash(val []byte, key string) {}
+
 func (sm *SelfMonitor) sendBatch() error {
 	url := "http://" + sm.Address + "/updates/"
 	data, err := ffjson.Marshal(sm.metrics)

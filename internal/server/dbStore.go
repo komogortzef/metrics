@@ -51,30 +51,8 @@ func NewDB(cx ctx.Context, addr string) (*DataBase, error) {
 	return &DataBase{pool}, nil
 }
 
-func connect(cx ctx.Context, db *DataBase) (*pgxpool.Conn, error) {
-	conn, err := db.Acquire(cx)
-	if err != nil {
-		if err = s.Retry(cx, func() error {
-			conn, err = db.Acquire(cx)
-			return ErrConnDB
-		}); err != nil {
-			return nil, ErrConnDB
-		}
-	}
-	if err = conn.Conn().Ping(cx); err != nil {
-		if err = s.Retry(cx, func() error {
-			err = conn.Conn().Ping(cx)
-			return ErrConnDB
-		}); err != nil {
-			return nil, ErrConnDB
-		}
-	}
-	log.Debug("DB connection is established")
-	return conn, nil
-}
-
 func (db *DataBase) Put(cx ctx.Context, met *s.Metrics) (*s.Metrics, error) {
-	conn, err := connect(cx, db)
+	conn, err := db.connectWithRetry(cx)
 	if err != nil {
 		return nil, fmt.Errorf("db put conn err: %w", err)
 	}
@@ -90,7 +68,7 @@ func (db *DataBase) Put(cx ctx.Context, met *s.Metrics) (*s.Metrics, error) {
 }
 
 func (db *DataBase) Get(cx ctx.Context, met *s.Metrics) (*s.Metrics, error) {
-	conn, err := connect(cx, db)
+	conn, err := db.connectWithRetry(cx)
 	if err != nil {
 		return nil, fmt.Errorf("db get conn err: %w", err)
 	}
@@ -106,7 +84,7 @@ func (db *DataBase) Get(cx ctx.Context, met *s.Metrics) (*s.Metrics, error) {
 }
 
 func (db *DataBase) List(cx ctx.Context) (metrics []*s.Metrics, err error) {
-	conn, err := connect(cx, db)
+	conn, err := db.connectWithRetry(cx)
 	if err != nil {
 		return nil, fmt.Errorf("db list conn err: %w", err)
 	}
@@ -130,7 +108,7 @@ func (db *DataBase) List(cx ctx.Context) (metrics []*s.Metrics, err error) {
 }
 
 func (db *DataBase) PutBatch(cx ctx.Context, mets []*s.Metrics) error {
-	conn, err := db.Acquire(cx)
+	conn, err := db.connectWithRetry(cx)
 	if err != nil {
 		return fmt.Errorf("putBatch err: %w", err)
 	}
@@ -207,4 +185,26 @@ func createTables(cx ctx.Context, pool *pgxpool.Pool) error {
 		return fmt.Errorf("couldn't create tables: %w", err)
 	}
 	return nil
+}
+
+func (db *DataBase) connectWithRetry(cx ctx.Context) (*pgxpool.Conn, error) {
+	conn, err := db.Acquire(cx)
+	if err != nil {
+		if err = s.Retry(cx, func() error {
+			conn, err = db.Acquire(cx)
+			return ErrConnDB
+		}); err != nil {
+			return nil, ErrConnDB
+		}
+	}
+	if err = conn.Conn().Ping(cx); err != nil {
+		if err = s.Retry(cx, func() error {
+			err = conn.Conn().Ping(cx)
+			return ErrConnDB
+		}); err != nil {
+			return nil, ErrConnDB
+		}
+	}
+	log.Debug("DB connection is established")
+	return conn, nil
 }

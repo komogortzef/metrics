@@ -20,6 +20,19 @@ type Executable interface {
 	Run(ctx.Context)
 }
 
+type config struct {
+	Address         string `env:"ADDRESS"`
+	Key             string `env:"KEY"`
+	FileStoragePath string
+	DBAddress       string `env:"DATABASE_DSN"`
+	StoreInterval   int    `env:"STORE_INTERVAL" envDefault:"-1"`
+	PollInterval    int    `env:"POLL_INTERVAL" envDefault:"-1"`
+	ReportInterval  int    `env:"REPORT_INTERVAL" envDefault:"-1"`
+	Restore         bool   `env:"RESTORE" envDefault:"true"`
+}
+
+type Option func(*config) error
+
 type AppType uint8
 
 const (
@@ -45,13 +58,15 @@ func Configure(cx ctx.Context, appType AppType, opts ...Option) (Executable, err
 			zap.Int("store interval", cfg.StoreInterval),
 			zap.Bool("restore", cfg.Restore),
 			zap.String("file store", cfg.FileStoragePath),
-			zap.String("database", cfg.DBAddress))
+			zap.String("database", cfg.DBAddress),
+			zap.String("decrypt key", cfg.Key))
 		return NewManager(cx, cfg)
 	default:
 		log.Info("SelfMonitor configuration",
 			zap.String("addr", cfg.Address),
 			zap.Int("poll interval", cfg.PollInterval),
-			zap.Int("report interval", cfg.ReportInterval))
+			zap.Int("report interval", cfg.ReportInterval),
+			zap.String("encrypt key", cfg.Key))
 		return NewMonitor(cfg)
 	}
 }

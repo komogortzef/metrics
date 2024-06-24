@@ -64,7 +64,6 @@ func (ms *MemStorage) List(_ ctx.Context) ([]*s.Metrics, error) {
 func (ms *MemStorage) PutBatch(cx ctx.Context, mets []*s.Metrics) error {
 	for _, metric := range mets {
 		if _, err := ms.Put(cx, metric); err != nil {
-			log.Warn("Mem PutBatch: couldn't insert batch to file or mem store")
 			return err
 		}
 	}
