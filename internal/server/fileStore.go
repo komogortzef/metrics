@@ -100,6 +100,7 @@ func (fs *FileStorage) dump(cx ctx.Context) error {
 
 func (fs *FileStorage) dumpWait(cx ctx.Context, dumpWaitDone chan struct{}) {
 	if fs.interval <= 0 {
+		close(dumpWaitDone)
 		return
 	}
 	ticker := time.NewTicker(time.Duration(fs.interval) * time.Second)
