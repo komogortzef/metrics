@@ -8,6 +8,9 @@ import (
 	log "metrics/internal/logger"
 	s "metrics/internal/service"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -34,6 +37,9 @@ type DataBase struct {
 var ErrConnDB = errors.New("db connection error")
 
 func NewDB(cx ctx.Context, addr string) (*DataBase, error) {
+	if err := runMigrations(addr); err != nil {
+		return nil, err
+	}
 	config, err := pgxpool.ParseConfig(addr)
 	if err != nil {
 		return nil, fmt.Errorf("newDB: unable to parse connection string: %w", err)
@@ -41,9 +47,6 @@ func NewDB(cx ctx.Context, addr string) (*DataBase, error) {
 	pool, err := pgxpool.NewWithConfig(cx, config)
 	if err != nil {
 		return nil, fmt.Errorf("newDB: unable to create connection pool: %w", err)
-	}
-	if err := createTables(cx, pool); err != nil {
-		return nil, err
 	}
 	if err := prepareQueries(cx, pool); err != nil {
 		return nil, err
@@ -173,19 +176,15 @@ func prepareQueries(cx ctx.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
-func createTables(cx ctx.Context, pool *pgxpool.Pool) error {
-	query := `
-	CREATE TABLE IF NOT EXISTS counter(
-		id VARCHAR(255) PRIMARY KEY,
-		value BIGINT NOT NULL
-	);
-	CREATE TABLE IF NOT EXISTS gauge(
-	   id VARCHAR(255) PRIMARY KEY,
-	   value DOUBLE PRECISION NOT NULL
-	);`
-	if _, err := pool.Exec(cx, query); err != nil {
-		return fmt.Errorf("couldn't create tables: %w", err)
+func runMigrations(addr string) error {
+	m, err := migrate.New("file://migrations", addr)
+	if err != nil {
+		return fmt.Errorf("migrate err: %w", err)
 	}
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return fmt.Errorf("migrate err: %w", err)
+	}
+	log.Debug("success migrations...")
 	return nil
 }
 

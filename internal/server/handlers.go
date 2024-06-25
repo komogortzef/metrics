@@ -54,7 +54,9 @@ func (mm *MetricManager) Run(cx ctx.Context) {
 			if err := fileStore.dump(cx); err != nil {
 				log.Warn("couldn't dump to file", zap.Error(err))
 			}
-			<-dumpWaitDone
+			if fileStore.interval > 0 {
+				<-dumpWaitDone
+			}
 		}
 		_ = mm.Shutdown(cx)
 		mm.Storage.Close()
