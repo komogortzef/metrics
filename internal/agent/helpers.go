@@ -88,5 +88,4 @@ func closeBody(r *http.Response) {
 	if r != nil && r.Body != nil {
 		r.Body.Close()
 	}
-
 }

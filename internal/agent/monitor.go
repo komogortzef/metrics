@@ -22,9 +22,10 @@ type SelfMonitor struct {
 	pollCount      int64
 	PollInterval   int
 	ReportInterval int
+	Rate           int
 }
 
-func (sm *SelfMonitor) collect(cx ctx.Context) {
+func (sm *SelfMonitor) collectMemStats(cx ctx.Context) {
 	for {
 		select {
 		case <-cx.Done():
@@ -66,7 +67,7 @@ func (sm *SelfMonitor) report(cx ctx.Context) {
 }
 
 func (sm *SelfMonitor) Run(cx ctx.Context) {
-	go sm.collect(cx)
+	go sm.collectMemStats(cx)
 	go sm.report(cx)
 
 	<-cx.Done()

@@ -29,6 +29,7 @@ type config struct {
 	PollInterval    int    `env:"POLL_INTERVAL" envDefault:"-1"`
 	ReportInterval  int    `env:"REPORT_INTERVAL" envDefault:"-1"`
 	Restore         bool   `env:"RESTORE" envDefault:"true"`
+	RateLimit       int    `env:"RATE_LIMIT"`
 }
 
 type Option func(*config) error
@@ -66,7 +67,8 @@ func Configure(cx ctx.Context, appType AppType, opts ...Option) (Executable, err
 			zap.String("addr", cfg.Address),
 			zap.Int("poll interval", cfg.PollInterval),
 			zap.Int("report interval", cfg.ReportInterval),
-			zap.String("encrypt key", cfg.Key))
+			zap.String("encrypt key", cfg.Key),
+			zap.Int("rate limit", cfg.RateLimit))
 		return NewMonitor(cfg)
 	}
 }
@@ -87,6 +89,7 @@ func NewMonitor(cfg *config) (*agent.SelfMonitor, error) {
 		PollInterval:   cfg.PollInterval,
 		ReportInterval: cfg.ReportInterval,
 		Key:            cfg.Key,
+		Rate:           cfg.RateLimit,
 	}, nil
 }
 

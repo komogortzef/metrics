@@ -31,6 +31,7 @@ func WithAgentFlags(cfg *config) (err error) {
 	poll := flag.Int("p", defaultPollInterval, "Poll Interval arg: -p <sec>")
 	rep := flag.Int("r", defaultReportInterval, "Report interval arg: -r <sec>")
 	key := flag.String("k", noFlag, "Encrypt key: -k <keystring>")
+	rate := flag.Int("l", 0, "rate limit: -l <int>")
 	flag.Parse()
 	if cfg.Address == "" {
 		cfg.Address = *addr
@@ -43,6 +44,9 @@ func WithAgentFlags(cfg *config) (err error) {
 	}
 	if cfg.Key == noFlag {
 		cfg.Key = *key
+	}
+	if cfg.RateLimit == 0 {
+		cfg.RateLimit = *rate
 	}
 	return
 }
