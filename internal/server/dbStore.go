@@ -97,6 +97,7 @@ func (db *DataBase) List(cx ctx.Context) (metrics []*s.Metrics, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("dbList query err: %w", err)
 	}
+	defer rows.Close()
 	for rows.Next() {
 		var met s.Metrics
 		var val any
