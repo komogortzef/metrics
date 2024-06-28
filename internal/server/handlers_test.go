@@ -1,41 +1,18 @@
 package server
 
 import (
-	"io"
 	"log"
 	"net/http"
-	"net/http/httptest"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
-func testRequest(
-	t *testing.T,
-	ts *httptest.Server,
-	method, path string) (*http.Response, string) {
-	req, err := http.NewRequest(method, ts.URL+path, http.NoBody)
-	require.NoError(t, err)
-
-	resp, err := ts.Client().Do(req)
-	require.NoError(t, err)
-
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-
-	return resp, string(respBody)
-}
-
 func TestHandlers(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		method      string
 		url         string
-		expected    int
 		description string
+		expected    int
 	}{
 		{
 			name:        "Valid POST request",
@@ -83,6 +60,5 @@ func TestHandlers(t *testing.T) {
 
 	for _, test := range tests {
 		log.Println("\n\nTEST NAME:", test.name)
-
 	}
 }

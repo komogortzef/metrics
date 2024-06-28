@@ -1,29 +1,44 @@
 package server
 
 import (
-	"fmt"
+	"strings"
 
-	m "metrics/internal/models"
-
-	"github.com/tidwall/gjson"
+	s "metrics/internal/service"
 )
 
-func addCounter(old []byte, input []byte) ([]byte, error) {
-	var oldStruct m.Metrics
-	if err := oldStruct.UnmarshalJSON(old); err != nil {
-		return nil, fmt.Errorf("addCounter(): unmarshal error: %w", err)
+func processURL(url string) (string, string, string) {
+	strs := strings.Split(url, "/")[2:]
+	switch len(strs) {
+	case 0:
+		return "", "", ""
+	case 1:
+		return strs[0], "", ""
+	case 2:
+		return strs[0], strs[1], ""
 	}
-	num := gjson.GetBytes(input, m.Delta).Int()
-	*oldStruct.Delta += num
-
-	return oldStruct.MarshalJSON()
+	return strs[0], strs[1], strs[2]
 }
 
-func getHelper(mtype string) helper {
-	switch mtype {
-	case m.Counter:
-		return addCounter
+func getQuery(oper dbOperation, met *s.Metrics) string {
+	switch oper {
+	case insertMetric:
+		if met.IsGauge() {
+			return insertGauge
+		}
+		return insertCounter
 	default:
-		return nil
+		if met.IsGauge() {
+			return selectGauge
+		}
+		return selectCounter
+	}
+}
+
+func setVal(met *s.Metrics, val any) {
+	if v, ok := val.(int64); ok {
+		met.Delta = &v
+	} else {
+		v, _ := val.(float64)
+		met.Value = &v
 	}
 }
