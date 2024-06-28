@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"metrics/internal/agent"
 	log "metrics/internal/logger"
@@ -79,18 +80,24 @@ func NewManager(cx ctx.Context, cfg *config) (*server.MetricManager, error) {
 	manager.Addr = cfg.Address
 	manager.Handler = getRoutes(cx, manager, cfg)
 	manager.Storage, err = setStorage(cx, cfg)
+
 	return manager, err
 }
 
 func NewMonitor(cfg *config) (*agent.SelfMonitor, error) {
-	return &agent.SelfMonitor{
-		Mtx:            &sync.RWMutex{},
-		Address:        cfg.Address,
-		PollInterval:   cfg.PollInterval,
-		ReportInterval: cfg.ReportInterval,
-		Key:            cfg.Key,
-		Rate:           cfg.RateLimit,
-	}, nil
+	monitor := agent.NewSelfMonitor()
+	monitor.Address = cfg.Address
+	monitor.Mtx = &sync.RWMutex{}
+	monitor.PollInterval = time.Duration(cfg.PollInterval) * time.Second
+	monitor.ReportInterval = time.Duration(cfg.ReportInterval) * time.Second
+	monitor.Key = cfg.Key
+	if cfg.RateLimit <= 0 {
+		monitor.Rate = 1
+	} else {
+		monitor.Rate = cfg.RateLimit
+	}
+
+	return monitor, nil
 }
 
 func CompletionCtx() (ctx.Context, ctx.CancelFunc) {
@@ -101,5 +108,6 @@ func CompletionCtx() (ctx.Context, ctx.CancelFunc) {
 		<-signChan
 		complete()
 	}()
+
 	return cx, complete
 }

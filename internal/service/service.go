@@ -35,6 +35,9 @@ func NewMetric(mtype, id string, val string) (*Metrics, error) {
 	if !met.IsCounter() && !met.IsGauge() {
 		return nil, ErrInvalidType
 	}
+	if val == "" {
+		return met, nil
+	}
 	if met.IsCounter() {
 		num, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
@@ -51,7 +54,7 @@ func NewMetric(mtype, id string, val string) (*Metrics, error) {
 	return met, nil
 }
 
-func BuildMetric(name string, val any) Metrics {
+func BuildMetric(name string, val any) *Metrics {
 	var metric Metrics
 	metric.ID = name
 	switch v := val.(type) {
@@ -63,7 +66,7 @@ func BuildMetric(name string, val any) Metrics {
 		metric.Delta = &v
 	}
 
-	return metric
+	return &metric
 }
 
 func (met Metrics) String() string {

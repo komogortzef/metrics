@@ -32,22 +32,35 @@ func setStorage(cx ctx.Context, cfg *config) (server.Storage, error) {
 }
 
 func getRoutes(cx ctx.Context, m *server.MetricManager, cfg *config) *chi.Mux {
-	ctxMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			r = r.WithContext(cx)
-			next.ServeHTTP(w, r)
-		}
+	ctxMiddleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			customCtx := wrapCtx{
+				ctxChi:  r.Context(),
+				Context: cx,
+			}
+			next.ServeHTTP(w, r.WithContext(customCtx))
+		})
 	}
 	router := chi.NewRouter()
 	router.Use(log.WithHandlerLog)
 	router.Use(c.GzipMiddleware)
-	router.Get("/", ctxMiddleware(m.GetAllHandler))
-	router.Get("/ping", ctxMiddleware(m.PingHandler))
-	router.Post("/value/", ctxMiddleware(sec.HashMiddleware(cfg.Key, m.GetJSON)))
-	router.Get("/value/{type}/{id}", ctxMiddleware(m.GetHandler))
-	router.Post("/update/", ctxMiddleware(sec.HashMiddleware(cfg.Key, m.UpdateJSON)))
-	router.Post("/update/{type}/{id}/{value}", ctxMiddleware(m.UpdateHandler))
-	router.Post("/updates/", ctxMiddleware(sec.HashMiddleware(cfg.Key, m.BatchHandler)))
+	router.Use(ctxMiddleware)
+	router.Get("/", m.GetAllHandler)
+	router.Get("/ping", m.PingHandler)
+	router.Post("/value/", sec.HashMiddleware(cfg.Key, m.GetJSON))
+	router.Get("/value/{type}/{id}", m.GetHandler)
+	router.Post("/update/", sec.HashMiddleware(cfg.Key, m.UpdateJSON))
+	router.Post("/update/{type}/{id}/{value}", m.UpdateHandler)
+	router.Post("/updates/", sec.HashMiddleware(cfg.Key, m.BatchHandler))
 
 	return router
+}
+
+type wrapCtx struct { // обертка для контекста, что бы не терять контекст chi.Router
+	ctx.Context
+	ctxChi ctx.Context
+}
+
+func (wr wrapCtx) Value(key any) any {
+	return wr.ctxChi.Value(key)
 }
