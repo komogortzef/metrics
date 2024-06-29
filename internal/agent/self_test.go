@@ -24,7 +24,6 @@ func mockHandler(w http.ResponseWriter, r *http.Request) {
 func TestReport(t *testing.T) {
 	mockServ := httptest.NewServer(http.HandlerFunc(mockHandler))
 	defer mockServ.Close()
-
 }
 
 func TestCollect(t *testing.T) {
@@ -33,5 +32,4 @@ func TestCollect(t *testing.T) {
 	}
 
 	fmt.Println(monitor)
-
 }

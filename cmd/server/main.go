@@ -1,25 +1,24 @@
 package main
 
 import (
-	c "metrics/internal/config"
-	log "metrics/internal/logger"
-	"metrics/internal/server"
+	"metrics/internal/config"
+	"metrics/internal/logger"
 
 	"go.uber.org/zap"
 )
 
 func main() {
-	server, err := c.Configure(
-		&server.MetricManager{},
-		c.WithEnvCmd,
-		c.WithRoutes,
-		c.WithStorage,
+	ctx, complete := config.CompletionCtx()
+	defer complete()
+
+	serv, err := config.Configure(ctx,
+		config.Server,
+		config.WithEnv,
+		config.WithServerFlags,
 	)
 	if err != nil {
-		log.Fatal("Config error", zap.Error(err))
+		logger.Fatal("server config error", zap.Error(err))
 	}
 
-	if err = server.Run(); err != nil {
-		log.Fatal("server running error", zap.Error(err))
-	}
+	serv.Run(ctx)
 }

@@ -1,128 +1,102 @@
 package config
 
 import (
-	"flag"
+	ctx "context"
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"sync"
-	"time"
+	"syscall"
 
 	"metrics/internal/agent"
-	"metrics/internal/compress"
 	log "metrics/internal/logger"
-	m "metrics/internal/models"
 	"metrics/internal/server"
 
-	"github.com/caarlos0/env/v11"
-	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
-type (
-	Configurable interface {
-		Run() error
-	}
+type Executable interface {
+	Run(ctx.Context)
+}
 
-	Option  func(Configurable) error
-	Service uint8
+type config struct {
+	Address         string `env:"ADDRESS"`
+	Key             string `env:"KEY"`
+	FileStoragePath string
+	DBAddress       string `env:"DATABASE_DSN"`
+	StoreInterval   int    `env:"STORE_INTERVAL" envDefault:"-1"`
+	PollInterval    int    `env:"POLL_INTERVAL" envDefault:"-1"`
+	ReportInterval  int    `env:"REPORT_INTERVAL" envDefault:"-1"`
+	Restore         bool   `env:"RESTORE" envDefault:"true"`
+}
+
+type Option func(*config) error
+
+type AppType uint8
+
+const (
+	Server AppType = iota
+	Agent
 )
 
-func Configure(service Configurable, opts ...Option) (Configurable, error) {
+func Configure(cx ctx.Context, appType AppType, opts ...Option) (Executable, error) {
 	err := log.InitLog()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("init log: %w", err)
 	}
-	for _, opt := range opts {
-		if err = opt(service); err != nil {
-			break
+	cfg := &config{}
+	for _, op := range opts {
+		if err := op(cfg); err != nil {
+			return nil, err
 		}
 	}
-
-	return service, err
+	switch appType {
+	case Server:
+		log.Info("MetricManager configuration",
+			zap.String("addr", cfg.Address),
+			zap.Int("store interval", cfg.StoreInterval),
+			zap.Bool("restore", cfg.Restore),
+			zap.String("file store", cfg.FileStoragePath),
+			zap.String("database", cfg.DBAddress),
+			zap.String("decrypt key", cfg.Key))
+		return NewManager(cx, cfg)
+	default:
+		log.Info("SelfMonitor configuration",
+			zap.String("addr", cfg.Address),
+			zap.Int("poll interval", cfg.PollInterval),
+			zap.Int("report interval", cfg.ReportInterval),
+			zap.String("encrypt key", cfg.Key))
+		return NewMonitor(cfg)
+	}
 }
 
-// заполнение значений полей структуры конфигурации переменными окружения,
-// или аргументами командной строки, или значениями по умолчанию
-func WithEnvCmd(service Configurable) (err error) {
-	err = env.Parse(service)
-	if err != nil {
-		return fmt.Errorf("env parse error: %w", err)
-	}
-	addr := flag.String("a", m.DefaultEndpoint, "Endpoint arg: -a <host:port>")
-	switch c := service.(type) {
-	case *agent.SelfMonitor:
-		poll := flag.Int("p", m.DefaultPollInterval, "Poll Interval arg: -p <sec>")
-		rep := flag.Int("r", m.DefaultReportInterval, "Report interval arg: -r <sec>")
-		flag.Parse()
-		if c.Address == "none" {
-			c.Address = *addr
-		}
-		if c.PollInterval < 0 {
-			c.PollInterval = *poll
-		}
-		if c.ReportInterval < 0 {
-			c.ReportInterval = *rep
-		}
-	case *server.MetricManager:
-		rest := flag.Bool("r", m.DefaultRestore, "Restore storage arg: -r <true|false>")
-		storeInterv := flag.Int("i", m.DefaultStoreInterval, "Store interval arg: -i <sec>")
-		filePath := flag.String("f", m.DefaultStorePath, "File path arg: -f </path/to/file>")
-		flag.Parse()
-		fmt.Println("rest:", *rest)
-		if c.Address == "none" {
-			c.Address = *addr
-		}
-		if c.StoreInterval < 0 {
-			c.StoreInterval = *storeInterv
-		}
-		if filestore, ok := os.LookupEnv("FILE_STORAGE_PATH"); !ok {
-			c.FileStoragePath = *filePath
-		} else {
-			c.FileStoragePath = filestore
-		}
-		if c.Restore {
-			c.Restore = *rest
-		}
-	}
-	return
+func NewManager(cx ctx.Context, cfg *config) (*server.MetricManager, error) {
+	var err error
+	manager := &server.MetricManager{Server: http.Server{}}
+	manager.Addr = cfg.Address
+	manager.Handler = getRoutes(cx, manager, cfg)
+	manager.Storage, err = setStorage(cx, cfg)
+	return manager, err
 }
 
-func WithRoutes(service Configurable) (err error) {
-	if manager, ok := service.(*server.MetricManager); ok {
-		router := chi.NewRouter()
-		router.Use(log.WithHandlerLog)
-		router.Get("/", compress.GzipMiddleware(manager.GetAllHandler))
-		router.Post("/value/", compress.GzipMiddleware(manager.GetJSON))
-		router.Get("/value/{type}/{id}", manager.GetHandler)
-		router.Post("/update/", compress.GzipMiddleware(manager.UpdateJSON))
-		router.Post("/update/{type}/{id}/{value}", manager.UpdateHandler)
-
-		manager.Serv = &http.Server{
-			Addr:    manager.Address,
-			Handler: router,
-		}
-	}
-	return
+func NewMonitor(cfg *config) (*agent.SelfMonitor, error) {
+	return &agent.SelfMonitor{
+		Mtx:            &sync.RWMutex{},
+		Address:        cfg.Address,
+		PollInterval:   cfg.PollInterval,
+		ReportInterval: cfg.ReportInterval,
+		Key:            cfg.Key,
+	}, nil
 }
 
-// установка хранилища для сервера в зависимости от значений полей конфигурации
-func WithStorage(service Configurable) (err error) {
-	if manager, ok := service.(*server.MetricManager); ok {
-		if manager.FileStoragePath != "" {
-			manager.Store = &server.FileStorage{
-				MemStorage: server.MemStorage{
-					Items: make(map[string][]byte, m.MetricsNumber),
-					Mtx:   &sync.RWMutex{},
-				},
-				FilePath: manager.FileStoragePath,
-				Interval: time.Duration(manager.StoreInterval),
-			}
-		} else {
-			manager.Store = &server.MemStorage{
-				Items: make(map[string][]byte, m.MetricsNumber),
-				Mtx:   &sync.RWMutex{},
-			}
-		}
-	}
-	return
+func CompletionCtx() (ctx.Context, ctx.CancelFunc) {
+	cx, complete := ctx.WithCancel(ctx.Background())
+	signChan := make(chan os.Signal, 1)
+	signal.Notify(signChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-signChan
+		complete()
+	}()
+	return cx, complete
 }
