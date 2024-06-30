@@ -1,11 +1,9 @@
 package agent
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
-	"sync"
 	"testing"
 )
 
@@ -27,9 +25,5 @@ func TestReport(t *testing.T) {
 }
 
 func TestCollect(t *testing.T) {
-	monitor := SelfMonitor{
-		Mtx: &sync.RWMutex{},
-	}
 
-	fmt.Println(monitor)
 }
