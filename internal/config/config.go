@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -87,7 +86,6 @@ func NewManager(cx ctx.Context, cfg *config) (*server.MetricManager, error) {
 func NewMonitor(cfg *config) (*agent.SelfMonitor, error) {
 	monitor := agent.NewSelfMonitor()
 	monitor.Address = cfg.Address
-	monitor.Mtx = &sync.RWMutex{}
 	monitor.PollInterval = time.Duration(cfg.PollInterval) * time.Second
 	monitor.ReportInterval = time.Duration(cfg.ReportInterval) * time.Second
 	monitor.Key = cfg.Key
