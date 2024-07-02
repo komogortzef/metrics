@@ -84,10 +84,15 @@ func (mm *MetricManager) UpdateHandler(rw http.ResponseWriter, req *http.Request
 }
 
 func (mm *MetricManager) GetHandler(rw http.ResponseWriter, req *http.Request) {
-	met, _ := s.NewMetric(
+	met, err := s.NewMetric(
 		chi.URLParam(req, mtype),
 		chi.URLParam(req, id),
 		"")
+	if errors.Is(s.ErrInvalidType, err) {
+		log.Warn("GetHandler()", zap.Error(err))
+		http.Error(rw, err.Error(), http.StatusNotFound)
+		return
+	}
 	metric, err := mm.Get(req.Context(), met)
 	if errors.Is(err, ErrConnDB) {
 		log.Warn("GetHandler(): storage error", zap.Error(err))

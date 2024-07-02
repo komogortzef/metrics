@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	log "metrics/internal/logger"
@@ -12,7 +13,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 )
 
-const ( // часто используемые строковые литералы в виде констант
+const (
 	gauge   = "gauge"
 	counter = "counter"
 )
@@ -20,6 +21,12 @@ const ( // часто используемые строковые литерал
 var (
 	ErrInvalidVal  = errors.New("invalid metric value")
 	ErrInvalidType = errors.New("invalid metric type")
+
+	metricsPool = sync.Pool{ // Pool для переиспользования структур Metrics
+		New: func() any {
+			return &Metrics{}
+		},
+	}
 )
 
 //go:generate ffjson $GOFILE
@@ -31,45 +38,70 @@ type Metrics struct {
 }
 
 func NewMetric(mtype, id string, val string) (*Metrics, error) {
-	met := &Metrics{ID: id, MType: mtype}
+	met, _ := metricsPool.Get().(*Metrics)
+	met.ID = id
+	met.MType = mtype
+
 	if !met.IsCounter() && !met.IsGauge() {
+		metricsPool.Put(met)
 		return nil, ErrInvalidType
 	}
 	if val == "" {
 		return met, nil
 	}
+
+	var err error
 	if met.IsCounter() {
-		num, err := strconv.ParseInt(val, 10, 64)
-		if err != nil {
-			return met, ErrInvalidVal
-		}
-		met.Delta = &num
+		err = met.setCounterValue(val)
 	} else {
-		num, err := strconv.ParseFloat(val, 64)
-		if err != nil {
-			return met, ErrInvalidVal
-		}
-		met.Value = &num
+		err = met.setGaugeValue(val)
 	}
+	if err != nil {
+		metricsPool.Put(met)
+		return nil, err
+	}
+
 	return met, nil
 }
 
-func BuildMetric(name string, val any) *Metrics {
-	var metric Metrics
-	metric.ID = name
-	switch v := val.(type) {
-	case float64:
-		metric.MType = gauge
-		metric.Value = &v
-	case int64:
-		metric.MType = counter
-		metric.Delta = &v
+func (met *Metrics) setCounterValue(val string) error {
+	num, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return ErrInvalidVal
 	}
-
-	return &metric
+	met.Delta = &num
+	return nil
 }
 
-func (met Metrics) String() string {
+func (met *Metrics) setGaugeValue(val string) error {
+	num, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return ErrInvalidVal
+	}
+	met.Value = &num
+	return nil
+}
+
+func BuildMetric(name string, val any) *Metrics {
+	met, _ := metricsPool.Get().(*Metrics)
+	met.ID = name
+
+	switch v := val.(type) {
+	case float64:
+		met.MType = gauge
+		met.Value = &v
+	case int64:
+		met.MType = counter
+		met.Delta = &v
+	default:
+		metricsPool.Put(met)
+		return nil
+	}
+
+	return met
+}
+
+func (met *Metrics) String() string {
 	if met.Delta == nil && met.Value == nil {
 		return fmt.Sprintf(" (%s: <empty>)", met.ID)
 	}
@@ -83,12 +115,11 @@ func (met *Metrics) MergeMetrics(met2 *Metrics) {
 	if met2 == nil {
 		return
 	}
-	if met2.IsCounter() {
-		if met2.Delta == nil {
-			return
+	if met2.IsCounter() && met2.Delta != nil {
+		if met.Delta == nil {
+			met.Delta = new(int64)
 		}
 		*met.Delta += *met2.Delta
-		return
 	}
 }
 
