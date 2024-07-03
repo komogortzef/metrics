@@ -52,7 +52,7 @@ func (sm *SelfMonitor) sendWorker(cx ctx.Context,
 			_ = s.Retry(cx, func() error {
 				r2, retErr := http.DefaultClient.Do(req)
 				closeBody(r2)
-				logger.Warn("retry error", zap.Error(err))
+				logger.Warn("retry result", zap.Error(retErr))
 				return retErr
 			})
 		} else {
