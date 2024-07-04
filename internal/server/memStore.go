@@ -9,7 +9,9 @@ import (
 	s "metrics/internal/service"
 )
 
-const metricsNumber = 32
+const metricsNumber = 31
+
+var numAllMetrics = runtime.NumCPU() + metricsNumber
 
 var ErrNoValue = errors.New("no such value in storage")
 
