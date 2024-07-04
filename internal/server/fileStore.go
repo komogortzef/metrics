@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const permissions = 0o6000
+const permissions = 0o666
 
 type FileStorage struct {
 	MemStorage
