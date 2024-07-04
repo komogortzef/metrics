@@ -4,6 +4,7 @@ import (
 	ctx "context"
 	"errors"
 	"sync"
+	"runtime"
 
 	log "metrics/internal/logger"
 	s "metrics/internal/service"
