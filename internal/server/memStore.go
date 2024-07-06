@@ -4,12 +4,15 @@ import (
 	ctx "context"
 	"errors"
 	"sync"
+	"runtime"
 
 	log "metrics/internal/logger"
 	s "metrics/internal/service"
 )
 
-const metricsNumber = 29
+const metricsNumber = 31
+
+var numAllMetrics = runtime.NumCPU() + metricsNumber
 
 var ErrNoValue = errors.New("no such value in storage")
 

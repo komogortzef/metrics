@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
+	"time"
 
 	"metrics/internal/agent"
 	log "metrics/internal/logger"
@@ -29,6 +29,7 @@ type config struct {
 	PollInterval    int    `env:"POLL_INTERVAL" envDefault:"-1"`
 	ReportInterval  int    `env:"REPORT_INTERVAL" envDefault:"-1"`
 	Restore         bool   `env:"RESTORE" envDefault:"true"`
+	RateLimit       int    `env:"RATE_LIMIT"`
 }
 
 type Option func(*config) error
@@ -66,7 +67,8 @@ func Configure(cx ctx.Context, appType AppType, opts ...Option) (Executable, err
 			zap.String("addr", cfg.Address),
 			zap.Int("poll interval", cfg.PollInterval),
 			zap.Int("report interval", cfg.ReportInterval),
-			zap.String("encrypt key", cfg.Key))
+			zap.String("encrypt key", cfg.Key),
+			zap.Int("rate limit", cfg.RateLimit))
 		return NewMonitor(cfg)
 	}
 }
@@ -77,17 +79,23 @@ func NewManager(cx ctx.Context, cfg *config) (*server.MetricManager, error) {
 	manager.Addr = cfg.Address
 	manager.Handler = getRoutes(cx, manager, cfg)
 	manager.Storage, err = setStorage(cx, cfg)
+
 	return manager, err
 }
 
 func NewMonitor(cfg *config) (*agent.SelfMonitor, error) {
-	return &agent.SelfMonitor{
-		Mtx:            &sync.RWMutex{},
-		Address:        cfg.Address,
-		PollInterval:   cfg.PollInterval,
-		ReportInterval: cfg.ReportInterval,
-		Key:            cfg.Key,
-	}, nil
+	monitor := agent.NewSelfMonitor()
+	monitor.Address = cfg.Address
+	monitor.PollInterval = time.Duration(cfg.PollInterval) * time.Second
+	monitor.ReportInterval = time.Duration(cfg.ReportInterval) * time.Second
+	monitor.Key = cfg.Key
+	if cfg.RateLimit <= 0 {
+		monitor.Rate = 1
+	} else {
+		monitor.Rate = cfg.RateLimit
+	}
+
+	return monitor, nil
 }
 
 func CompletionCtx() (ctx.Context, ctx.CancelFunc) {
@@ -98,5 +106,6 @@ func CompletionCtx() (ctx.Context, ctx.CancelFunc) {
 		<-signChan
 		complete()
 	}()
+
 	return cx, complete
 }
